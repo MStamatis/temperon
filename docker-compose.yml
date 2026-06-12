@@ -1,0 +1,35 @@
+name: eos-switch
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: eos-switch:dev
+    container_name: eos-switch-dev
+    gpus: all
+    shm_size: 8gb
+    init: true
+    working_dir: /workspace
+    volumes:
+      # Relative mount on purpose: the host path contains literal brackets
+      # ("Drive[D]") that break when spelled out in some tooling.
+      - .:/workspace
+      - data-cache:/data
+    environment:
+      EOS_DATA_DIR: /data
+    command: ["sleep", "infinity"]
+
+  # One-shot helper to (re)generate uv.lock without needing uv on the host:
+  #   docker compose run --rm lock
+  lock:
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm
+    profiles: ["tools"]
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    entrypoint: ["uv"]
+    command: ["lock"]
+
+volumes:
+  data-cache:

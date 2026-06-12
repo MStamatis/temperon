@@ -1,0 +1,5 @@
+# Force LF everywhere: the repo is edited on Windows but always executed
+# inside a Linux container.
+* text=auto eol=lf
+*.png binary
+*.pdf binary

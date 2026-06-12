@@ -1,0 +1,685 @@
+optimizers:
+  adam:
+    lr: 0.001
+    betas:
+    - 0.9
+    - 0.999
+    weight_decay: 0.0001
+  adamw:
+    lr: 0.001
+    betas:
+    - 0.9
+    - 0.999
+    weight_decay: 0.06
+  sgd:
+    lr: 0.1
+    momentum: 0.9
+    weight_decay: 0.0005
+    nesterov: true
+  nadam:
+    lr: 0.001
+    betas:
+    - 0.9
+    - 0.999
+    weight_decay: 0.0001
+  Adagrad:
+    lr: 1.0e-05
+  amsgrad:
+    lr: 1.0e-05
+    betas:
+    - 0.9
+    - 0.999
+    weight_decay: 0.0
+  adabelief:
+    lr: 1.0e-05
+    betas:
+    - 0.9
+    - 0.999
+    eps: 1.0e-08
+    weight_decay: 0.0001
+  yogi:
+    lr: 1.0e-05
+    betas:
+    - 0.9
+    - 0.999
+    weight_decay: 0.0
+  qhadam:
+    lr: 1.0e-05
+    betas:
+    - 0.9
+    - 0.999
+    nus:
+    - 0.7
+    - 1.0
+    weight_decay: 0.0
+  adamp:
+    lr: 1.0e-05
+    betas:
+    - 0.9
+    - 0.999
+    weight_decay: 0.0
+  novograd:
+    lr: 1.0e-05
+    betas:
+    - 0.95
+    - 0.98
+    weight_decay: 0.0
+  lion:
+    lr: 1.0e-05
+    betas:
+    - 0.9
+    - 0.99
+    weight_decay: 0.0
+  ranger:
+    lr: 0.0007
+    betas:
+    - 0.95
+    - 0.999
+    weight_decay: 0.0
+    alpha: 0.5
+    k: 5
+    N_sma_threshold: 5
+    eps: 1.0e-05
+  ranger21:
+    lr: 0.001
+    betas:
+    - 0.9
+    - 0.999
+    weight_decay: 0.0001
+    beta0: 0.9
+    eps: 1.0e-08
+    num_iterations: 400
+  adan:
+    lr: 0.00012
+    betas:
+    - 0.98
+    - 0.92
+    - 0.99
+    weight_decay: 0.0
+  AdaHessian:
+    lr: 0.15
+    betas:
+    - 0.9
+    - 0.999
+    weight_decay: 0.0
+    eps: 0.0001
+    hessian_power: 0.5
+  rmsprop:
+    lr: 1.0e-05
+    alpha: 0.9
+    momentum: 0.9
+    weight_decay: 0.0001
+    centered: true
+  radam:
+    lr: 0.001
+    betas:
+    - 0.9
+    - 0.999
+    weight_decay: 0.0001
+  adai:
+    lr: 0.1
+    betas:
+    - 0.9
+    - 0.99
+    weight_decay: 0.0004
+    decoupled: true
+    eps: 0.001
+  gravity:
+    lr: 1.0e-05
+    beta: 0.9
+    alpha: 0.01
+  TAM:
+    lr: 0.2
+  SPlus:
+    lr: 0.2
+  Fromage:
+    lr: 0.01
+  AggMo:
+    lr: 0.1
+  GaLore:
+    lr: 0.01
+  ADOPT:
+    lr: 0.0001
+  fira:
+    lr: 0.01
+  Apollo:
+    lr: 0.01
+    weight_decay: 0.0001
+    eps: 0.0001
+  AccSGD:
+    lr: 1.0e-05
+    kappa: 10000
+    xi: 10.0
+  PID:
+    lr: 0.085
+  ASGD:
+    lr: 1.0e-05
+  SGDW:
+    lr: 1.0e-05
+  AdaNorm:
+    lr: 1.0e-05
+  Nero:
+    lr: 0.01
+optimizer_pool:
+  num_active: 7
+  num_backup: 3
+  enable_failure_swaps: false
+  active_optimizers:
+  - sgd
+  - nadam
+  - adam
+  - adamw
+  - ranger
+  - adan
+  - lion
+  failure_threshold: -0.15
+  consecutive_failure_limit: 3
+  catastrophic_drop: 0.3
+  catastrophic_failure_limit: 2
+  blacklist_threshold: 2
+  compatibility_groups:
+    momentum_based:
+      enabled: false
+      members:
+      - sgd
+      - rmsprop
+      - novograd
+      characteristics:
+        base_type: gradient_descent
+        uses_momentum: true
+        uses_adaptive_lr: false
+        stability: high
+      swap_priority: 2
+      internal_swap_only: false
+    adam_family:
+      enabled: false
+      members:
+      - adam
+      - adamw
+      - nadam
+      - amsgrad
+      characteristics:
+        base_type: adam
+        uses_momentum: true
+        uses_adaptive_lr: true
+        has_bias_correction: true
+        stability: very_high
+      swap_priority: 1
+      internal_swap_only: false
+    adam_advanced:
+      enabled: false
+      members:
+      - radam
+      - adan
+      characteristics:
+        base_type: adam_improved
+        uses_momentum: true
+        uses_adaptive_lr: true
+        has_warmup: true
+        stability: high
+      swap_priority: 1
+      internal_swap_only: false
+    adaptive_family:
+      enabled: false
+      members:
+      - adabelief
+      - yogi
+      - adamp
+      characteristics:
+        base_type: adaptive
+        uses_momentum: true
+        uses_adaptive_lr: true
+        has_special_convergence: true
+        stability: medium_high
+      swap_priority: 2
+      internal_swap_only: false
+    hybrid_family:
+      enabled: false
+      members:
+      - ranger
+      - ranger21
+      - qhadam
+      characteristics:
+        base_type: hybrid
+        combines_methods: true
+        uses_lookahead: true
+        stability: medium
+      swap_priority: 3
+      internal_swap_only: false
+    experimental:
+      enabled: false
+      members:
+      - lion
+      - gravity
+      - adai
+      - AdaHessian
+      characteristics:
+        base_type: experimental
+        uses_special_math: true
+        stability: variable
+      swap_priority: 4
+      internal_swap_only: true
+  compatibility_rules:
+    allow_cross_group_swap: true
+    prefer_same_group: true
+    state_transfer_compatible:
+      sgd:
+      - rmsprop
+      - novograd
+      - adam
+      - nadam
+      rmsprop:
+      - sgd
+      - adam
+      - amsgrad
+      novograd:
+      - sgd
+      - adam
+      - adamw
+      adam:
+      - adamw
+      - nadam
+      - amsgrad
+      - radam
+      - adan
+      adamw:
+      - adam
+      - nadam
+      - amsgrad
+      - radam
+      - adan
+      nadam:
+      - adam
+      - adamw
+      - amsgrad
+      - radam
+      amsgrad:
+      - adam
+      - adamw
+      - nadam
+      - radam
+      radam:
+      - adam
+      - adamw
+      - nadam
+      - ranger
+      - ranger21
+      adan:
+      - adam
+      - adamw
+      - radam
+      adabelief:
+      - yogi
+      - adamp
+      - adam
+      - adamw
+      yogi:
+      - adabelief
+      - adamp
+      - adam
+      adamp:
+      - adabelief
+      - yogi
+      - qhadam
+      ranger:
+      - ranger21
+      - radam
+      - adam
+      ranger21:
+      - ranger
+      - radam
+      - adam
+      qhadam:
+      - adamp
+      - adam
+      - nadam
+      lion:
+      - adamw
+      - adam
+      gravity: []
+      adai:
+      - adam
+      - sgd
+      AdaHessian: []
+    preferred_swaps:
+      sgd:
+        first_choice:
+        - radam
+        - adamw
+        - adam
+        second_choice:
+        - nadam
+        - adai
+        third_choice:
+        - rmsprop
+        - novograd
+        avoid:
+        - lion
+        - gravity
+        - AdaHessian
+      rmsprop:
+        first_choice:
+        - sgd
+        - adam
+        second_choice:
+        - amsgrad
+        - adamw
+        third_choice:
+        - novograd
+        avoid:
+        - experimental
+      novograd:
+        first_choice:
+        - adam
+        - adamw
+        second_choice:
+        - sgd
+        - rmsprop
+        third_choice:
+        - radam
+        avoid:
+        - lion
+        - gravity
+      adam:
+        first_choice:
+        - adamw
+        - nadam
+        - amsgrad
+        second_choice:
+        - radam
+        - adan
+        third_choice:
+        - adabelief
+        - ranger
+        avoid:
+        - sgd
+        - gravity
+        - AdaHessian
+      adamw:
+        first_choice:
+        - adam
+        - nadam
+        - amsgrad
+        second_choice:
+        - radam
+        - adan
+        third_choice:
+        - ranger
+        - lion
+        avoid:
+        - sgd
+        - gravity
+      nadam:
+        first_choice:
+        - adam
+        - adamw
+        - amsgrad
+        second_choice:
+        - radam
+        - qhadam
+        third_choice:
+        - ranger
+        avoid:
+        - sgd
+        - experimental
+      amsgrad:
+        first_choice:
+        - adam
+        - adamw
+        - nadam
+        second_choice:
+        - radam
+        third_choice:
+        - rmsprop
+        avoid:
+        - experimental
+      radam:
+        first_choice:
+        - ranger
+        - ranger21
+        - adam
+        second_choice:
+        - adamw
+        - nadam
+        - adan
+        third_choice:
+        - amsgrad
+        avoid:
+        - sgd
+        - gravity
+      adan:
+        first_choice:
+        - radam
+        - adam
+        - adamw
+        second_choice:
+        - nadam
+        third_choice:
+        - ranger
+        avoid:
+        - sgd
+        - rmsprop
+      adabelief:
+        first_choice:
+        - yogi
+        - adamp
+        second_choice:
+        - adam
+        - adamw
+        - amsgrad
+        third_choice:
+        - ranger
+        - radam
+        avoid:
+        - sgd
+        - lion
+      yogi:
+        first_choice:
+        - adabelief
+        - adamp
+        second_choice:
+        - adam
+        - adamw
+        third_choice:
+        - ranger
+        avoid:
+        - sgd
+        - novograd
+      adamp:
+        first_choice:
+        - adabelief
+        - yogi
+        - qhadam
+        second_choice:
+        - adam
+        - adamw
+        third_choice:
+        - nadam
+        avoid:
+        - sgd
+        - experimental
+      ranger:
+        first_choice:
+        - ranger21
+        - radam
+        second_choice:
+        - adam
+        - adamw
+        - nadam
+        third_choice:
+        - adabelief
+        avoid:
+        - sgd
+        - gravity
+      ranger21:
+        first_choice:
+        - ranger
+        - radam
+        second_choice:
+        - adam
+        - adamw
+        - adan
+        third_choice:
+        - adabelief
+        avoid:
+        - sgd
+        - novograd
+      qhadam:
+        first_choice:
+        - adamp
+        - nadam
+        second_choice:
+        - adam
+        - adamw
+        third_choice:
+        - ranger
+        avoid:
+        - sgd
+        - rmsprop
+      lion:
+        first_choice:
+        - adamw
+        - adam
+        second_choice:
+        - gravity
+        - adai
+        third_choice:
+        - radam
+        - adan
+        avoid:
+        - sgd
+        - rmsprop
+        - AdaHessian
+      gravity:
+        first_choice:
+        - adai
+        - lion
+        second_choice:
+        - AdaHessian
+        third_choice: []
+        avoid:
+        - adam_family
+        - momentum_based
+      adai:
+        first_choice:
+        - gravity
+        - lion
+        second_choice:
+        - adam
+        - sgd
+        third_choice:
+        - adamw
+        - radam
+        avoid:
+        - AdaHessian
+      AdaHessian:
+        first_choice:
+        - gravity
+        second_choice:
+        - lion
+        - adai
+        third_choice: []
+        avoid:
+        - momentum_based
+        - adam_family
+  group_interactions:
+    enabled: false
+    momentum_based:
+      compatible_with:
+      - adam_family
+      - adam_advanced
+      incompatible_with:
+      - experimental
+    adam_family:
+      compatible_with:
+      - adam_advanced
+      - adaptive_family
+      - hybrid_family
+      incompatible_with: []
+    adam_advanced:
+      compatible_with:
+      - adam_family
+      - hybrid_family
+      - adaptive_family
+      incompatible_with:
+      - momentum_based
+    adaptive_family:
+      compatible_with:
+      - adam_family
+      - adam_advanced
+      - hybrid_family
+      incompatible_with:
+      - momentum_based
+    hybrid_family:
+      compatible_with:
+      - adam_family
+      - adam_advanced
+      - adaptive_family
+      incompatible_with:
+      - momentum_based
+      - experimental
+    experimental:
+      compatible_with:
+      - experimental
+      incompatible_with:
+      - momentum_based
+      - hybrid_family
+  lr_scaling_rules:
+    from_high_to_low:
+      scale_factor: 0.01
+      applies_to:
+      - from:
+        - sgd
+        - gravity
+        - adai
+        to:
+        - adam_family
+        - adam_advanced
+        - adaptive_family
+    from_low_to_high:
+      scale_factor: 10.0
+      applies_to:
+      - from:
+        - adam_family
+        - adam_advanced
+        to:
+        - sgd
+        - gravity
+        - adai
+    special_cases:
+      AdaHessian:
+        override_lr: 0.15
+        no_scaling: true
+      lion:
+        max_lr: 0.0003
+        force_clip: true
+  swap_recovery:
+    grace_period_epochs: 5
+    relaxed_threshold_factor: 1.5
+    reset_payoff_history: true
+    transfer_momentum: true
+    transfer_mode: adaptive
+    momentum_scaling: 0.5
+    instability_lr_factor: 0.5
+    instability_min_lr: 1.0e-06
+    instability_swap_threshold: 2
+    adaptive_lr:
+      enabled: true
+      mode: progressive
+      warmup_epochs: 3
+      initial_scale: 0.5
+      target_scale: 1.0
+training:
+  warmup_epochs: 17
+  warmup_optimizer: sgd
+  dropafter_warmup: true
+  phases:
+    warmup:
+      min_val_acc: 0.5
+      plateau_threshold: 0.001
+      min_epochs: 10
+roulette:
+  switch_granularity: epoch
+  switch_every_steps: 1
+  switch_probability: 1.0
+  avoid_repeat: true

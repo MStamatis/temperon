@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "OptiRoulette"
+version = "0.1.0"
+description = "PyTorch optimizer with random switching, LR scaling and pool swaps"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+  { name = "Stamatis Mastromichalakis" }
+]
+keywords = ["pytorch", "optimizer", "meta optimizer", "deep-learning", "training", "optimization"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "torch>=2.1.0",
+  "numpy>=1.23.0",
+  "PyYAML>=6.0",
+  "pytorch-optimizer>=3.7.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/MStamatis/OptiRoulette"
+Repository = "https://github.com/MStamatis/OptiRoulette"
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2.1",
+  "twine>=5.1.1",
+  "pytest>=8.2.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"optiroulette.resources" = ["optimized.yaml"]

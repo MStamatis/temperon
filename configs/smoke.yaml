@@ -1,0 +1,29 @@
+# Sanity-check config: small CNN, CIFAR-10 subset. Used by Phase 0 acceptance.
+run_name: smoke
+seed: 42
+device: auto
+deterministic: false
+epochs: 3
+batch_size: 128
+mixed_precision: bf16   # ignored on CPU
+grad_clip: 0.0
+
+dataset:
+  name: cifar10
+  smoke_subset: 5000
+
+augment:
+  enabled: true
+  cutout: 0
+
+model: smallcnn
+
+controller:
+  type: fixed
+  optimizer: adamw
+  lr: 1.0e-3
+  weight_decay: 0.01
+  schedule: none
+
+probes:
+  enabled: false

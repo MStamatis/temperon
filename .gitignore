@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Experiment outputs (root-level only; src/eos_switch/data is source code)
+/results/
+/data/
+
+# OS noise
+.DS_Store
+Thumbs.db
