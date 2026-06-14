@@ -32,9 +32,14 @@ class ProbeScheduler:
         self.micro_batch = int(cfg.get("micro_batch", 128))
         self.power_iters = int(cfg.get("power_iters", 15))
         self.burst_len = int(cfg.get("burst_len", 5))
-        # Preconditioned lambda_max (the expensive part: `power_iters` HVPs)
-        # runs on every Nth regular probe; batch_sharpness runs on all.
+        # Preconditioned lambda_max is the expensive probe (`power_iters` HVPs
+        # in fp32). batch_sharpness (1 HVP) runs on EVERY probe; the costly
+        # precond runs only on every `precond_every`-th regular probe, and on
+        # the first `burst_precond_len` probes of each post-switch burst (the
+        # scientifically critical moments). This keeps the dense EoSS signal
+        # while bounding wall-clock overhead.
         self.precond_every = max(1, int(cfg.get("precond_every", 1)))
+        self.burst_precond_len = int(cfg.get("burst_precond_len", self.burst_len))
         self._recent: deque[dict] = deque(maxlen=self.burst_len)
         self._pending_burst = 0
         self._switch_step: int | None = None
@@ -63,8 +68,17 @@ class ProbeScheduler:
         if not burst and step % self.probe_every != 0:
             return None
         t0 = time.perf_counter()
-        batch = self.data.sample_probe_batch(self.micro_batch, self.generator)
-        include_precond = burst or (self.n_probes % self.precond_every == 0)
+        x, y = self.data.sample_probe_batch(self.micro_batch, self.generator)
+        if x.is_cuda and x.ndim == 4:
+            # Match the model's channels_last layout; otherwise every HVP
+            # forward/backward pays layout-conversion overhead.
+            x = x.contiguous(memory_format=torch.channels_last)
+        batch = (x, y)
+        if burst:
+            burst_idx = self.burst_len - self._pending_burst  # 0-based post-switch index
+            include_precond = burst_idx < self.burst_precond_len
+        else:
+            include_precond = self.n_probes % self.precond_every == 0
         rec = full_probe(
             self.model,
             self.loss_fn,

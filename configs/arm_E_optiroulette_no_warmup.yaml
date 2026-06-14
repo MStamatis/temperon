@@ -1,0 +1,31 @@
+# Arm E: OptiRoulette with roulette from epoch 0 (warmup disabled).
+run_name: arm_E_optiroulette_no_warmup
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 0.0
+
+dataset:
+  name: cifar100
+
+augment:
+  enabled: true
+  cutout: 0
+
+model: resnet18
+
+controller:
+  type: optiroulette
+  warmup: false
+
+probes:
+  enabled: true
+  probe_every: 100
+  micro_batch: 128
+  power_iters: 15
+  burst_len: 5
+  precond_every: 16       # expensive precond probe: steady-state every 16th probe (~every 4 epochs)
+  burst_precond_len: 2     # ...but on the first 2 probes of each post-switch burst (catapult)

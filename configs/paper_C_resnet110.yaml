@@ -1,0 +1,40 @@
+# Paper-comparable track: arm C (warmup-only ablation) on ResNet-110.
+run_name: paper_C_resnet110
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 0.0
+
+dataset:
+  name: cifar100
+
+augment:
+  enabled: true
+  cutout: 0
+
+model: resnet110
+
+controller:
+  type: sequential
+  phases:
+    - optimizer: sgd_momentum
+      lr: 0.1
+      momentum: 0.9
+      nesterov: true
+      weight_decay: 5.0e-4
+      epochs: 17
+    - optimizer: adamw
+      lr: 1.0e-3
+      weight_decay: 0.01
+
+probes:
+  enabled: true
+  probe_every: 100
+  micro_batch: 128
+  power_iters: 15
+  burst_len: 5
+  precond_every: 16       # expensive precond probe: steady-state every 16th probe (~every 4 epochs)
+  burst_precond_len: 2     # ...but on the first 2 probes of each post-switch burst (catapult)
