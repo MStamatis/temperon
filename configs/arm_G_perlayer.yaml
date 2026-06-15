@@ -1,0 +1,40 @@
+# Arm G: per-layer geometry pool with a UCB bandit (Phase 4). Same 17-epoch
+# SGD warmup as arms D/F, then each layer-group's 2D weights get a geometry
+# from {muon, adamw, lion, sgd_momentum} chosen by an independent UCB bandit
+# (context: gradient stable rank + noise scale); all 1D params use AdamW.
+run_name: arm_G_perlayer
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 0.0
+
+dataset:
+  name: cifar100
+
+augment:
+  enabled: true
+  cutout: 0
+
+model: resnet18
+
+controller:
+  type: perlayer
+  warmup_epochs: 17
+  warmup_lr: 0.1
+  warmup_weight_decay: 5.0e-4
+  select_every: 200        # re-select geometries every N steps
+  select_until_frac: 0.8   # freeze selections after 80% (settle late)
+  ucb_c: 2.0               # UCB exploration constant
+  state_transfer: geometry
+  onedim_lr: 1.0e-3        # fixed AdamW lr for all 1D params
+  geom_lrs:                # per-geometry lr for the 2D layer-groups
+    muon: 0.02
+    adamw: 1.0e-3
+    lion: 3.0e-4
+    sgd_momentum: 0.1
+
+probes:
+  enabled: false

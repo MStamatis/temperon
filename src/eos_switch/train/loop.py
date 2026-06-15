@@ -196,7 +196,11 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
     logger.finalize(summary)
     import json
 
-    for attr, fname in (("rewards", "rewards.jsonl"), ("checks", "checks.jsonl")):
+    for attr, fname in (
+        ("rewards", "rewards.jsonl"),
+        ("checks", "checks.jsonl"),
+        ("selections", "selections.jsonl"),
+    ):
         records = getattr(controller, attr, None)
         if records:
             with open(Path(out_dir) / fname, "w", encoding="utf-8") as fh:

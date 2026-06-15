@@ -31,6 +31,9 @@ def apply_smoke_overrides(cfg: dict) -> dict:
             phase["epochs"] = 1
     if ctrl.get("type") in ("optiroulette", "eos_switch") and ctrl.get("warmup", True):
         ctrl["warmup_epochs"] = 1
+    if ctrl.get("type") == "perlayer":
+        ctrl["warmup_epochs"] = 1
+        ctrl["select_every"] = min(int(ctrl.get("select_every", 200)), 20)
     probes = cfg.get("probes", {})
     if probes.get("enabled", False):
         probes["probe_every"] = min(int(probes.get("probe_every", 50)), 20)
