@@ -13,6 +13,9 @@ from .compatibility import OptimizerCompatibility
 from .defaults import (
     get_default_seed,
     get_default_lr_scaling_rules,
+    get_default_compatibility_groups,
+    get_default_compatibility_rules,
+    get_default_group_interactions,
     get_default_optimizer_specs,
     get_default_pool_setup,
     get_default_roulette_config,
@@ -80,6 +83,9 @@ class OptiRouletteOptimizer(torch.optim.Optimizer):
         warmup_epochs: int = 0,
         warmup_config: Optional[Dict[str, Any]] = None,
         lr_scaling_rules: Optional[Dict[str, Any]] = None,
+        compatibility_groups: Optional[Dict[str, Any]] = None,
+        compatibility_rules: Optional[Dict[str, Any]] = None,
+        group_interactions: Optional[Dict[str, Any]] = None,
         pool_config: Optional[PoolConfig] = None,
         active_names: Optional[List[str]] = None,
         backup_names: Optional[List[str]] = None,
@@ -130,10 +136,17 @@ class OptiRouletteOptimizer(torch.optim.Optimizer):
 
         self.compatibility: Optional[OptimizerCompatibility] = None
         # LR compatibility adjusts learning rate when moving between optimizer
-        # families (e.g., adaptive -> momentum methods).
-        if lr_scaling_rules:
+        # families (e.g., adaptive -> momentum methods). The group membership
+        # map MUST be passed alongside the rules, because the lr_scaling rules
+        # reference group names (e.g. "adam_family") on their from/to sides.
+        if lr_scaling_rules or compatibility_groups or compatibility_rules or group_interactions:
             self.compatibility = OptimizerCompatibility(
-                {"lr_scaling_rules": lr_scaling_rules}
+                {
+                    "groups": compatibility_groups or {},
+                    "rules": compatibility_rules or {},
+                    "group_interactions": group_interactions or {},
+                    "lr_scaling_rules": lr_scaling_rules or {},
+                }
             )
 
         self.pool: Optional[OptimizerPoolManager] = None
@@ -506,6 +519,9 @@ class OptiRoulette(OptiRouletteOptimizer):
         roulette: Optional[Dict[str, Any]] = None,
         pool_config: Optional[Any] = None,
         lr_scaling_rules: Optional[Dict[str, Any]] = None,
+        compatibility_groups: Optional[Dict[str, Any]] = None,
+        compatibility_rules: Optional[Dict[str, Any]] = None,
+        group_interactions: Optional[Dict[str, Any]] = None,
         active_names: Optional[List[str]] = None,
         backup_names: Optional[List[str]] = None,
         switch_granularity: Optional[str] = None,
@@ -574,6 +590,15 @@ class OptiRoulette(OptiRouletteOptimizer):
         if lr_scaling_rules is None and using_default_specs:
             lr_scaling_rules = get_default_lr_scaling_rules()
 
+        # Group membership / rules / interactions are required for the
+        # group-name-based lr_scaling rules to resolve and fire.
+        if compatibility_groups is None and using_default_specs:
+            compatibility_groups = get_default_compatibility_groups()
+        if compatibility_rules is None and using_default_specs:
+            compatibility_rules = get_default_compatibility_rules()
+        if group_interactions is None and using_default_specs:
+            group_interactions = get_default_group_interactions()
+
         if pool_config is None and using_default_specs:
             # Default pool setup is only injected when user does not pass a
             # custom optimizer set/spec list.
@@ -604,6 +629,9 @@ class OptiRoulette(OptiRouletteOptimizer):
             warmup_epochs=warmup_epochs,
             warmup_config=warmup_config,
             lr_scaling_rules=lr_scaling_rules,
+            compatibility_groups=compatibility_groups,
+            compatibility_rules=compatibility_rules,
+            group_interactions=group_interactions,
             pool_config=pool_cfg_obj,
             active_names=active_names,
             backup_names=backup_names,

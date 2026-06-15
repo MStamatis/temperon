@@ -39,6 +39,9 @@ explicit = true
 [tool.uv.sources]
 torch = { index = "pytorch-cu128" }
 torchvision = { index = "pytorch-cu128" }
+# Use our vendored, patched OptiRoulette (restores the LR-scaling that the
+# PyPI 0.1.0 wheel silently disabled). See third_party/optiroulette.
+optiroulette = { path = "third_party/optiroulette" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,7 +1,9 @@
 .git/
 results/
 data/
-third_party/
+# third_party/optiroulette is a path dependency and must reach the build
+# context; ignore only its build artifacts.
+**/*.egg-info/
 **/__pycache__/
 *.pyc
 .pytest_cache/

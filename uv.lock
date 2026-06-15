@@ -163,7 +163,7 @@ dev = [
 requires-dist = [
     { name = "matplotlib" },
     { name = "numpy" },
-    { name = "optiroulette", specifier = ">=0.1.0" },
+    { name = "optiroulette", directory = "third_party/optiroulette" },
     { name = "pandas" },
     { name = "pyyaml" },
     { name = "torch", specifier = ">=2.7", index = "https://download.pytorch.org/whl/cu128" },
@@ -598,17 +598,25 @@ wheels = [
 [[package]]
 name = "optiroulette"
 version = "0.1.0"
-source = { registry = "https://pypi.org/simple" }
+source = { directory = "third_party/optiroulette" }
 dependencies = [
     { name = "numpy", marker = "sys_platform == 'linux'" },
     { name = "pytorch-optimizer", marker = "sys_platform == 'linux'" },
     { name = "pyyaml", marker = "sys_platform == 'linux'" },
     { name = "torch", marker = "sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e6/b4/ac77c23c50249440cec27660538aea5da36bd794776f69fb3acfa38ded8e/optiroulette-0.1.0.tar.gz", hash = "sha256:d4097282940558493c4c93d9113264171611e23ce7bb963f9519f2566ea0f350", size = 21858, upload-time = "2026-02-20T04:33:12.132Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/5d/d1/8b6f8624a38107c2d1c75e2c1e82ba98ebb638814ba580ff9f3d42815542/optiroulette-0.1.0-py3-none-any.whl", hash = "sha256:463dc646ca63e73e3efc5fa9882508c3287c37dabb623cab1ed047a212d6f9f5", size = 23415, upload-time = "2026-02-20T04:33:10.7Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "build", marker = "extra == 'dev'", specifier = ">=1.2.1" },
+    { name = "numpy", specifier = ">=1.23.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.2.0" },
+    { name = "pytorch-optimizer", specifier = ">=3.7.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "torch", specifier = ">=2.1.0" },
+    { name = "twine", marker = "extra == 'dev'", specifier = ">=5.1.1" },
 ]
+provides-extras = ["dev"]
 
 [[package]]
 name = "packaging"

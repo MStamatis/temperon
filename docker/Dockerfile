@@ -22,8 +22,11 @@ RUN uv python install 3.12
 
 WORKDIR /workspace
 COPY pyproject.toml uv.lock .python-version ./
-# Dependencies only; the project itself is installed (editable) from the
-# bind mount with `uv sync --frozen` after the container starts.
+# The vendored, patched OptiRoulette is a path dependency, so it must be
+# present for the dependency sync to build it.
+COPY third_party/optiroulette ./third_party/optiroulette
+# Dependencies only; the project itself is installed from the bind mount with
+# `uv sync --frozen` after the container starts.
 RUN uv sync --frozen --no-install-project
 
 ENV PATH="/opt/venv/bin:${PATH}"

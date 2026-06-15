@@ -83,6 +83,29 @@ def get_default_lr_scaling_rules() -> Dict[str, Any]:
     return dict(pool_cfg.get("lr_scaling_rules", {}) or {})
 
 
+def get_default_compatibility_groups() -> Dict[str, Any]:
+    """Return optimizer compatibility groups from pool defaults.
+
+    Required by the LR-scaling rules: they reference group names (e.g.
+    ``adam_family``) on the from/to sides, which only resolve when the group
+    membership map is supplied to ``OptimizerCompatibility``.
+    """
+    pool_cfg = _load_default_config().get("optimizer_pool", {}) or {}
+    return dict(pool_cfg.get("compatibility_groups", {}) or {})
+
+
+def get_default_compatibility_rules() -> Dict[str, Any]:
+    """Return optimizer compatibility rules (state-transfer, preferred swaps)."""
+    pool_cfg = _load_default_config().get("optimizer_pool", {}) or {}
+    return dict(pool_cfg.get("compatibility_rules", {}) or {})
+
+
+def get_default_group_interactions() -> Dict[str, Any]:
+    """Return cross-group interaction settings from pool defaults."""
+    pool_cfg = _load_default_config().get("optimizer_pool", {}) or {}
+    return dict(pool_cfg.get("group_interactions", {}) or {})
+
+
 def get_default_pool_setup() -> Tuple[Dict[str, Any], List[str], List[str]]:
     """Return default pool config plus active/backup optimizer name lists.
 
