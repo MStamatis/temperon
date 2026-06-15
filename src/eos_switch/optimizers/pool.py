@@ -61,6 +61,8 @@ def build_optimizer(
         return torch.optim.Adam(params, lr=lr, betas=betas, weight_decay=weight_decay)
     if name == "adamw":
         return torch.optim.AdamW(params, lr=lr, betas=betas, weight_decay=weight_decay)
+    if name == "nadam":
+        return torch.optim.NAdam(params, lr=lr, betas=betas, weight_decay=weight_decay)
     if name == "lion":
         from pytorch_optimizer import Lion
 

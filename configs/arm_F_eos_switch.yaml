@@ -1,0 +1,48 @@
+# Arm F: EoS-aware switching controller (Phase 3). Same 17-epoch SGD warmup
+# as arm D (fair comparison), then margin-based switching over a small pool
+# with geometry-consistent state transfer. Ablation: --set
+# controller.state_transfer=naive  (the paper's x0.5 momentum baseline).
+run_name: arm_F_eos_switch
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 0.0
+
+dataset:
+  name: cifar100
+
+augment:
+  enabled: true
+  cutout: 0
+
+model: resnet18
+
+controller:
+  type: eos_switch
+  warmup_epochs: 17
+  warmup_optimizer: sgd_momentum
+  warmup_lr: 0.1
+  warmup_momentum: 0.9
+  warmup_weight_decay: 5.0e-4
+  warmup_nesterov: true
+  check_every: 50          # margin check cadence (steps)
+  margin_floor: 0.1        # switch if margin stays below this...
+  k: 3                     # ...for k consecutive checks
+  state_transfer: geometry # geometry | naive | none
+  reward_lambda: 1.0
+  micro_batch: 128
+  power_iters: 15
+  # Post-warmup pool is adaptive optimizers only (SGD is the warmup optimizer
+  # and is dropped afterwards, mirroring arm D's drop_after_warmup). This also
+  # avoids the lr*margin criterion trivially favouring SGD's large lr.
+  pool:
+    - {optimizer: adamw, lr: 1.0e-3, weight_decay: 0.01}
+    - {optimizer: nadam, lr: 1.0e-3, weight_decay: 1.0e-4}
+    - {optimizer: lion, lr: 3.0e-4, weight_decay: 0.0}
+
+# The controller probes margins itself; the generic sharpness scheduler is off.
+probes:
+  enabled: false

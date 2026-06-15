@@ -180,6 +180,53 @@ def _preconditioned_sharpness_from_op(
     }
 
 
+def candidate_margin(
+    op: HvpOperator,
+    name: str,
+    lr: float,
+    momentum: float = 0.0,
+    grad_sq_ema: dict | None = None,
+    eps: float = 1e-8,
+) -> dict:
+    """Cheap (1 HVP) stability-margin estimate for a *candidate* optimizer.
+
+    Curvature along the candidate's would-be update direction in its own
+    geometry: adam -> preconditioned gradient g/(sqrt(v_est)+eps); sgd -> g;
+    lion -> sign(g); muon -> Newton-Schulz(g). Used by the EoS controller to
+    pick the next optimizer; must be called inside probe_precision().
+    """
+    from eos_switch.optimizers.muon import newton_schulz_orthogonalize
+
+    geom = geometry_of(name)
+    g = op.grad_vector()
+    d: list[torch.Tensor] = []
+    for p, gi in zip(op.params, g):
+        if geom == "adam":
+            v = grad_sq_ema.get(p) if grad_sq_ema else None
+            denom = (v.sqrt() + eps) if v is not None else torch.ones_like(gi)
+            d.append(gi / denom)
+        elif geom == "sign":
+            d.append(gi.sign())
+        elif geom == "spectral":
+            d.append(newton_schulz_orthogonalize(gi) if gi.ndim == 2 else gi)
+        else:  # sgd
+            d.append(gi)
+    dd = float(dot(d, d))
+    if dd == 0.0:
+        sharp = 0.0
+    else:
+        hd = op.apply(d)
+        sharp = float(dot(hd, d)) / dd
+    threshold = stability_threshold(name, lr, momentum=momentum)
+    return {
+        "name": name,
+        "lr": lr,
+        "directional_sharpness": sharp,
+        "threshold": threshold,
+        "margin": stability_margin(threshold, sharp),
+    }
+
+
 def full_probe(
     model: nn.Module,
     loss_fn,

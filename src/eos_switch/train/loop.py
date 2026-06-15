@@ -80,6 +80,10 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
     milestones = MilestoneTracker()
     gen = make_generator(seed, device)
     loss_fn = F.cross_entropy
+    # Controllers that probe internally (e.g. the EoS-switch controller) get
+    # the data/loss context so they can measure margins during training.
+    if hasattr(controller, "attach_probe_context"):
+        controller.attach_probe_context(loss_fn, data, make_generator(seed + 2, device))
     aug_cfg = cfg.get("augment", {})
     augment = bool(aug_cfg.get("enabled", True))
     cutout = int(aug_cfg.get("cutout", 0))
@@ -177,7 +181,7 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
         "best_val_acc": round(best_val_acc, 4),
         "total_time_s": round(total_s, 2),
         "n_switches": len(controller.switch_events),
-        "probe_overhead_frac": round(probe_sched.overhead_frac(total_s), 4) if probe_sched else 0.0,
+        "probe_overhead_frac": round(_probe_overhead(probe_sched, controller, total_s), 4),
         **milestones.as_flat_dict(),
     }
     meta = {
@@ -190,4 +194,18 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
     }
     logger.write_meta(meta)
     logger.finalize(summary)
+    if getattr(controller, "rewards", None):
+        import json
+
+        with open(Path(out_dir) / "rewards.jsonl", "w", encoding="utf-8") as fh:
+            for r in controller.rewards:
+                fh.write(json.dumps(r) + "\n")
     return summary
+
+
+def _probe_overhead(probe_sched, controller, total_s: float) -> float:
+    if probe_sched is not None:
+        return probe_sched.overhead_frac(total_s)
+    if hasattr(controller, "overhead_frac"):
+        return controller.overhead_frac(total_s)
+    return 0.0
