@@ -194,12 +194,14 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
     }
     logger.write_meta(meta)
     logger.finalize(summary)
-    if getattr(controller, "rewards", None):
-        import json
+    import json
 
-        with open(Path(out_dir) / "rewards.jsonl", "w", encoding="utf-8") as fh:
-            for r in controller.rewards:
-                fh.write(json.dumps(r) + "\n")
+    for attr, fname in (("rewards", "rewards.jsonl"), ("checks", "checks.jsonl")):
+        records = getattr(controller, attr, None)
+        if records:
+            with open(Path(out_dir) / fname, "w", encoding="utf-8") as fh:
+                for r in records:
+                    fh.write(json.dumps(r) + "\n")
     return summary
 
 

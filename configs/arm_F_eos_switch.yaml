@@ -28,13 +28,18 @@ controller:
   warmup_momentum: 0.9
   warmup_weight_decay: 5.0e-4
   warmup_nesterov: true
-  check_every: 50          # margin check cadence (steps)
-  margin_floor: 0.1        # switch if margin stays below this...
-  k: 3                     # ...for k consecutive checks
+  check_every: 100         # margin/plateau check cadence (steps)
+  # Primary trigger: loss-EMA plateau (adaptive optimizers rarely hit their
+  # loose EoS edge, so margin-floor alone never fires).
+  plateau_window: 5        # switch if loss-EMA improved < plateau_delta...
+  plateau_delta: 0.01      # ...(relative) over the last plateau_window checks
+  cooldown_checks: 3       # no second switch for this many checks (anti-thrash)
+  # Secondary trigger: margin-floor (mainly relevant for SGD-tight geometries).
+  margin_floor: 0.1
+  k: 3
   state_transfer: geometry # geometry | naive | none
   reward_lambda: 1.0
   micro_batch: 128
-  power_iters: 15
   # Post-warmup pool is adaptive optimizers only (SGD is the warmup optimizer
   # and is dropped afterwards, mirroring arm D's drop_after_warmup). This also
   # avoids the lr*margin criterion trivially favouring SGD's large lr.

@@ -31,9 +31,17 @@ from eos_switch.optimizers.state_transfer import transfer_state
 
 class EosSwitchController(Controller):
     def _build(self) -> None:
-        self.check_every = int(self.cfg.get("check_every", 50))
+        self.check_every = int(self.cfg.get("check_every", 100))
         self.margin_floor = float(self.cfg.get("margin_floor", 0.1))
         self.k = int(self.cfg.get("k", 3))
+        # Loss-plateau trigger (primary, since adaptive optimizers rarely reach
+        # their loose EoS edge): switch if the loss-EMA improved by less than
+        # `plateau_delta` (relative) over the last `plateau_window` checks.
+        self.plateau_window = int(self.cfg.get("plateau_window", 5))
+        self.plateau_delta = float(self.cfg.get("plateau_delta", 0.01))
+        self.loss_ema_beta = float(self.cfg.get("loss_ema_beta", 0.9))
+        # Cooldown: no second switch for this many checks (anti-thrash).
+        self.cooldown_checks = int(self.cfg.get("cooldown_checks", 3))
         self.transfer_mode = str(self.cfg.get("state_transfer", "geometry"))
         self.reward_lambda = float(self.cfg.get("reward_lambda", 1.0))
         self.adam_warm_steps = int(self.cfg.get("adam_warm_steps", 1000))
@@ -77,6 +85,11 @@ class EosSwitchController(Controller):
         self._probe_seconds = 0.0
         self.n_probes = 0
         self._transitioned = False
+        # plateau / cooldown / per-check diagnostics
+        self._loss_ema: float | None = None
+        self._loss_hist: list[float] = []
+        self._checks_since_switch = 10**9  # first post-warmup switch ungated
+        self.checks: list[dict] = []
         # dense-reward bookkeeping
         self._last_reward_step = 0
         self._last_reward_loss: float | None = None
@@ -124,28 +137,9 @@ class EosSwitchController(Controller):
         return ranked[0]
 
     # ---- probing -------------------------------------------------------
-    def _probe_active_margin(self) -> float:
-        from eos_switch.probes.sharpness import preconditioned_sharpness
-
-        batch = self._data.sample_probe_batch(self.micro_batch, self._gen)
-        t0 = time.perf_counter()
-        out = preconditioned_sharpness(
-            self.active_optimizer,
-            self.active_name,
-            self.model,
-            self._loss_fn,
-            batch,
-            lr=self.active_lr,
-            iters=self.power_iters,
-            generator=self._gen,
-        )
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-        self._probe_seconds += time.perf_counter() - t0
-        self.n_probes += 1
-        return out["stability_margin"]
-
-    def _probe_candidate_margins(self) -> dict[str, float]:
+    def _probe_all_margins(self) -> dict[str, float]:
+        """1-HVP directional stability margin for every pool optimizer, sharing
+        one gradient graph (active + candidates in a single cheap probe)."""
         from eos_switch.probes.hvp import HvpOperator, preserve_bn_stats
         from eos_switch.probes.precision import probe_precision
         from eos_switch.probes.sharpness import candidate_margin
@@ -165,6 +159,17 @@ class EosSwitchController(Controller):
         self._probe_seconds += time.perf_counter() - t0
         self.n_probes += 1
         return margins
+
+    def _plateau(self) -> bool:
+        """True if loss-EMA improved < plateau_delta (relative) over the last
+        plateau_window checks."""
+        h = self._loss_hist
+        if len(h) <= self.plateau_window:
+            return False
+        old, new = h[-1 - self.plateau_window], h[-1]
+        if old is None or not (old == old) or old == 0.0:  # NaN/zero guard
+            return False
+        return (old - new) / abs(old) < self.plateau_delta
 
     # ---- switching -----------------------------------------------------
     def _switch_to(self, step: int, new_name: str, reason: str) -> None:
@@ -193,6 +198,7 @@ class EosSwitchController(Controller):
         self._active = new_name
         self._last_used[new_name] = step
         self._low_margin_count = 0
+        self._checks_since_switch = 0
 
     def begin_step(self, step: int) -> torch.optim.Optimizer:
         epoch = step // max(self.steps_per_epoch, 1)
@@ -200,31 +206,50 @@ class EosSwitchController(Controller):
         # warmup -> eos transition (once)
         if self.phase == "warmup" and epoch >= self.warmup_epochs:
             self.phase = "eos"
-            if self._has_probe_ctx:
-                margins = self._probe_candidate_margins()
-            else:
-                margins = {n: 1.0 for n in self.opts}
+            margins = self._probe_all_margins() if self._has_probe_ctx else {n: 1.0 for n in self.opts}
             nxt = self._select_next(margins, exclude=None)
             self._switch_to(step, nxt, reason="warmup_exit")
             self._transitioned = True
             return self.active_optimizer
 
-        # EoS margin-based switching
+        # EoS switching: plateau (primary) or margin-floor (secondary), gated
+        # by a cooldown to prevent thrashing.
         if (
             self.phase == "eos"
             and self._has_probe_ctx
             and step > 0
             and step % self.check_every == 0
         ):
-            margin = self._probe_active_margin()
-            if self._register_active_margin(margin):
-                cand = self._probe_candidate_margins()
-                nxt = self._select_next(cand, exclude=self.active_name)
-                self._switch_to(step, nxt, reason="margin_floor")
+            margins = self._probe_all_margins()
+            active_margin = margins[self.active_name]
+            self._loss_hist.append(self._loss_ema if self._loss_ema is not None else float("nan"))
+            floor_hit = self._register_active_margin(active_margin)
+            plateau_hit = self._plateau()
+            trigger = "margin_floor" if floor_hit else ("plateau" if plateau_hit else None)
+            rec = {
+                "step": step,
+                "epoch": round(self.epoch_of(step), 3),
+                "optimizer": self.active_name,
+                "margin": round(active_margin, 4),
+                "loss_ema": self._loss_ema,
+                "low_margin_count": self._low_margin_count,
+                "trigger": trigger,
+            }
+            if trigger and self._checks_since_switch >= self.cooldown_checks:
+                nxt = self._select_next(margins, exclude=self.active_name)
+                self._switch_to(step, nxt, reason=trigger)
+                rec["switched_to"] = nxt
+            else:
+                self._checks_since_switch += 1
+            self.checks.append(rec)
 
         return self.active_optimizer
 
     def end_step(self, step: int, loss: float) -> None:
+        # Loss EMA drives the plateau trigger.
+        be = self.loss_ema_beta
+        self._loss_ema = loss if self._loss_ema is None else be * self._loss_ema + (1 - be) * loss
+
         # Update the running grad^2 EMA (for fresh second-moment estimates).
         b = self.grad_sq_beta
         with torch.no_grad():
