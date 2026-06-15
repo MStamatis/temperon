@@ -62,6 +62,15 @@ def test_warmup_then_transition_records_switch():
     assert ctrl.switch_events[0].reason.startswith("warmup_exit")
 
 
+def test_window_closes_after_fraction():
+    ctrl = _ctrl(warmup_epochs=0, switch_until_frac=0.5)
+    # total = steps_per_epoch(5) * total_epochs(4) = 20; window closes at step 10
+    assert ctrl._window_open(0) is True
+    assert ctrl._window_open(9) is True
+    assert ctrl._window_open(10) is False
+    assert ctrl._window_open(15) is False
+
+
 def test_grad_sq_ema_updates_on_end_step():
     ctrl = _ctrl(warmup_epochs=0)
     model = ctrl.model

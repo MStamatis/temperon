@@ -42,6 +42,9 @@ class EosSwitchController(Controller):
         self.loss_ema_beta = float(self.cfg.get("loss_ema_beta", 0.9))
         # Cooldown: no second switch for this many checks (anti-thrash).
         self.cooldown_checks = int(self.cfg.get("cooldown_checks", 3))
+        # Annealed switching window: allow switches only in the first
+        # `switch_until_frac` of training, then settle (final ~ best).
+        self.switch_until_frac = float(self.cfg.get("switch_until_frac", 0.6))
         self.transfer_mode = str(self.cfg.get("state_transfer", "geometry"))
         self.reward_lambda = float(self.cfg.get("reward_lambda", 1.0))
         self.adam_warm_steps = int(self.cfg.get("adam_warm_steps", 1000))
@@ -127,6 +130,9 @@ class EosSwitchController(Controller):
         else:
             self._low_margin_count = 0
         return self._low_margin_count >= self.k
+
+    def _window_open(self, step: int) -> bool:
+        return step < self.switch_until_frac * self.total_epochs * self.steps_per_epoch
 
     def _select_next(self, margins: dict[str, float], exclude: str | None) -> str:
         cands = [n for n in self.opts if n != exclude]
@@ -226,6 +232,7 @@ class EosSwitchController(Controller):
             floor_hit = self._register_active_margin(active_margin)
             plateau_hit = self._plateau()
             trigger = "margin_floor" if floor_hit else ("plateau" if plateau_hit else None)
+            window_open = self._window_open(step)
             rec = {
                 "step": step,
                 "epoch": round(self.epoch_of(step), 3),
@@ -234,8 +241,9 @@ class EosSwitchController(Controller):
                 "loss_ema": self._loss_ema,
                 "low_margin_count": self._low_margin_count,
                 "trigger": trigger,
+                "window_open": window_open,
             }
-            if trigger and self._checks_since_switch >= self.cooldown_checks:
+            if trigger and window_open and self._checks_since_switch >= self.cooldown_checks:
                 nxt = self._select_next(margins, exclude=self.active_name)
                 self._switch_to(step, nxt, reason=trigger)
                 rec["switched_to"] = nxt

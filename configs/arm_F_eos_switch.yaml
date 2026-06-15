@@ -34,6 +34,7 @@ controller:
   plateau_window: 5        # switch if loss-EMA improved < plateau_delta...
   plateau_delta: 0.01      # ...(relative) over the last plateau_window checks
   cooldown_checks: 3       # no second switch for this many checks (anti-thrash)
+  switch_until_frac: 0.6   # allow switches only in the first 60%, then settle
   # Secondary trigger: margin-floor (mainly relevant for SGD-tight geometries).
   margin_floor: 0.1
   k: 3

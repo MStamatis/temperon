@@ -54,7 +54,11 @@ def _seed_state(
         st["step"] = torch.tensor(float(adam_warm_steps))
         st["exp_avg"] = m.clone()
         v = grad_sq_ema.get(p) if grad_sq_ema else None
-        st["exp_avg_sq"] = v.detach().clone() if v is not None else torch.zeros_like(p)
+        v = v.detach().clone() if v is not None else torch.zeros_like(p)
+        # Floor the second moment at m^2 so the first post-switch step is bounded
+        # (~lr*sign(m)). Without this, switching late (small grads -> tiny v)
+        # gives lr*m/sqrt(tiny v) -> explosion -> divergence.
+        st["exp_avg_sq"] = torch.maximum(v, m * m)
         # NAdam keeps an extra running product of the momentum schedule; seed it
         # so NAdam.step() does not KeyError. Harmless for Adam/AdamW (ignored).
         st["mu_product"] = torch.tensor(1.0)
