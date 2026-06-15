@@ -27,7 +27,10 @@ controller:
   warmup_weight_decay: 5.0e-4
   select_every: 200        # re-select geometries every N steps
   select_until_frac: 0.8   # freeze selections after 80% (settle late)
-  ucb_c: 2.0               # UCB exploration constant
+  ucb_c: 1.0               # UCB exploration constant (lower -> less churn)
+  # Per-region credit: each layer-group's bandit is rewarded by how fast that
+  # group's own gradient norm drops, so regions specialize (no global sync).
+  norm_ema_beta: 0.9
   state_transfer: geometry
   onedim_lr: 1.0e-3        # fixed AdamW lr for all 1D params
   geom_lrs:                # per-geometry lr for the 2D layer-groups

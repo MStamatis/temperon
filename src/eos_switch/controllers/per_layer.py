@@ -103,7 +103,10 @@ class PerLayerController(Controller):
         self._grad_sq_ema: dict[torch.Tensor, torch.Tensor] = {}
         self._loss_ema: float | None = None
         self._last_reward_time = time.perf_counter()
-        self._last_reward_loss: float | None = None
+        # per-region gradient-norm EMA -> per-region bandit credit
+        self._norm_beta = float(self.cfg.get("norm_ema_beta", 0.9))
+        self._region_norm_ema: dict[str, float] = {}
+        self._last_region_norm: dict[str, float] = {}
         self.selections: list[dict] = []
 
     # ---- construction helpers -----------------------------------------
@@ -148,12 +151,13 @@ class PerLayerController(Controller):
         return sum(vals) / len(vals) if vals else 0.5
 
     # ---- selection ----------------------------------------------------
-    def _reselect(self, step: int, reward: float | None) -> None:
+    def _reselect(self, step: int, rewards: dict[str, float | None]) -> None:
         changed = []
         for r in self.regions:
             b = self._bandits[r]
-            if reward is not None:
-                b.update(self._region_geom[r], reward)
+            rw = rewards.get(r)
+            if rw is not None:
+                b.update(self._region_geom[r], rw)
             new_geom = b.select()
             if new_geom != self._region_geom[r]:
                 old = self._region_opt[r]
@@ -173,7 +177,8 @@ class PerLayerController(Controller):
                 ))
         self.selections.append({
             "step": step, "epoch": round(self.epoch_of(step), 3),
-            "geoms": dict(self._region_geom), "reward": reward,
+            "geoms": dict(self._region_geom),
+            "rewards": {r: (round(v, 5) if v is not None else None) for r, v in rewards.items()},
         })
 
     def _seed_priors(self) -> None:
@@ -207,13 +212,17 @@ class PerLayerController(Controller):
         window_open = step < self.select_until_frac * total
         if self.phase == "perlayer" and window_open and step > 0 and step % self.select_every == 0:
             now = time.perf_counter()
-            reward = None
-            if self._last_reward_loss is not None and self._loss_ema is not None:
-                dt = max(now - self._last_reward_time, 1e-6)
-                reward = (self._last_reward_loss - self._loss_ema) / dt
-            self._reselect(step, reward)
+            dt = max(now - self._last_reward_time, 1e-6)
+            rewards: dict[str, float | None] = {}
+            for r in self.regions:
+                cur = self._region_norm_ema.get(r)
+                prev = self._last_region_norm.get(r)
+                # reward = how fast this region's gradient norm dropped (per s)
+                rewards[r] = ((prev - cur) / dt) if (cur is not None and prev is not None) else None
+                if cur is not None:
+                    self._last_region_norm[r] = cur
+            self._reselect(step, rewards)
             self._last_reward_time = now
-            self._last_reward_loss = self._loss_ema
 
         return self.active_optimizer
 
@@ -232,6 +241,15 @@ class PerLayerController(Controller):
                 else:
                     self._grad_sq_ema[p].mul_(b).add_(g * g, alpha=1 - b)
                     self._grad_ema[p].mul_(b).add_(g, alpha=1 - b)
+            # per-region gradient-norm EMA (per-region bandit credit signal)
+            nb = self._norm_beta
+            for r in self.regions:
+                sq = sum(float(p.grad.detach().pow(2).sum()) for p in self.geom_groups[r] if p.grad is not None)
+                norm = sq**0.5
+                if r not in self._region_norm_ema:
+                    self._region_norm_ema[r] = norm
+                else:
+                    self._region_norm_ema[r] = nb * self._region_norm_ema[r] + (1 - nb) * norm
 
     @property
     def active_name(self) -> str:
