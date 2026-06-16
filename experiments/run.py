@@ -34,6 +34,9 @@ def apply_smoke_overrides(cfg: dict) -> dict:
     if ctrl.get("type") == "perlayer":
         ctrl["warmup_epochs"] = 1
         ctrl["select_every"] = min(int(ctrl.get("select_every", 200)), 20)
+    if ctrl.get("type") == "edge_lr":
+        ctrl["warmup_steps"] = min(int(ctrl.get("warmup_steps", 200)), 20)
+        ctrl["check_every"] = min(int(ctrl.get("check_every", 50)), 10)
     probes = cfg.get("probes", {})
     if probes.get("enabled", False):
         probes["probe_every"] = min(int(probes.get("probe_every", 50)), 20)

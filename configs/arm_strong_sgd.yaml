@@ -1,0 +1,34 @@
+# Strong SGD baseline: the canonical CIFAR ResNet recipe (SGD 0.1, momentum
+# 0.9, nesterov, weight decay 5e-4, cosine to 0, cutout). Our earlier baselines
+# were AdamW-centric (~0.73); this establishes the real ceiling / fair target
+# and is itself an edge-of-stability trainer.
+run_name: arm_strong_sgd
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 0.0
+
+dataset:
+  name: cifar100
+
+augment:
+  enabled: true
+  cutout: 8
+
+model: resnet18
+
+controller:
+  type: fixed
+  optimizer: sgd_momentum
+  lr: 0.1
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 5.0e-4
+  schedule: cosine
+  min_lr: 0.0
+
+probes:
+  enabled: false

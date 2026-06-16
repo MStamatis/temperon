@@ -26,6 +26,7 @@ class FixedController(Controller):
             lr=self._base_lr,
             momentum=float(self.cfg.get("momentum", 0.9)),
             weight_decay=float(self.cfg.get("weight_decay", 0.0)),
+            nesterov=bool(self.cfg.get("nesterov", False)),
         )
         self._schedule = str(self.cfg.get("schedule", "none")).lower()
         self._min_lr = float(self.cfg.get("min_lr", 0.0))

@@ -24,6 +24,10 @@ def build_controller(cfg: dict) -> Controller:
         from eos_switch.controllers.per_layer import PerLayerController  # Phase 4
 
         return PerLayerController(cfg)
+    if kind == "edge_lr":
+        from eos_switch.controllers.edge_lr import EdgeLRController  # arm H
+
+        return EdgeLRController(cfg)
     raise ValueError(f"unknown controller type {cfg['type']!r}")
 
 

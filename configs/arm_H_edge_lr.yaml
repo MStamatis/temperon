@@ -1,0 +1,39 @@
+# Arm H: Edge-of-Stability adaptive LR (super-convergence). Single SGD-momentum
+# whose lr is driven to safety*(2+2*beta)/lambda_max, with lambda_max measured
+# by power iteration every check_every steps. Trains at the edge to exploit the
+# catapult mechanism. Judge primarily by first-hit milestones (speed).
+run_name: arm_H_edge_lr
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 0.0
+
+dataset:
+  name: cifar100
+
+augment:
+  enabled: true
+  cutout: 8
+
+model: resnet18
+
+controller:
+  type: edge_lr
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 5.0e-4
+  lr_init: 0.1
+  lr_min: 1.0e-3
+  lr_max: 0.5            # safety cap on the edge-targeted lr
+  safety: 0.9           # run just below the edge: lr = 0.9*(2+2b)/lambda_max
+  check_every: 50       # re-estimate lambda_max / lr every N steps
+  power_iters: 20
+  micro_batch: 128
+  lambda_ema_beta: 0.6  # smoothing of the curvature estimate
+  warmup_steps: 200     # linear LR warmup before edge control engages
+
+probes:
+  enabled: false
