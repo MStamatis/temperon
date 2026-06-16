@@ -52,6 +52,21 @@ def test_edge_lr_records_checks():
     assert "lambda_max" in ctrl.checks[0] and "lr" in ctrl.checks[0]
 
 
+def test_annealed_edge_lr_decays_to_zero():
+    # one-cycle-at-edge: peak set by edge, cosine envelope -> ~0 at the end
+    ctrl = _ctrl(anneal="cosine", warmup_steps=0, check_every=5, lr_max=0.5)
+    ctrl._data = object()
+    ctrl._probe_lambda_max = lambda: 40.0  # edge peak = 0.0855
+    ctrl.begin_step(5)               # early -> envelope ~1 -> near peak
+    early = ctrl.active_lr
+    total = ctrl.total_epochs * ctrl.steps_per_epoch  # 30
+    ctrl.begin_step(total - 1)       # end -> envelope ~0
+    late = ctrl.active_lr
+    assert early > 0.07              # near the 0.0855 edge peak
+    assert late < 0.02              # annealed toward 0
+    assert late < early
+
+
 def test_strong_sgd_fixed_controller_nesterov():
     cfg = {"type": "fixed", "optimizer": "sgd_momentum", "lr": 0.1, "momentum": 0.9,
            "nesterov": True, "weight_decay": 5e-4, "schedule": "cosine"}

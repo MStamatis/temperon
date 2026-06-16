@@ -17,6 +17,7 @@ The training loop attaches the probe context (loss_fn, data, generator).
 
 from __future__ import annotations
 
+import math
 import time
 
 import torch
@@ -46,8 +47,13 @@ class EdgeLRController(Controller):
         self.micro_batch = int(self.cfg.get("micro_batch", 128))
         self.lambda_beta = float(self.cfg.get("lambda_ema_beta", 0.6))
         self.warmup_steps = int(self.cfg.get("warmup_steps", 200))
+        # anneal: none -> hold lr at the edge; cosine -> one-cycle-at-the-edge
+        # (edge sets the PEAK, a cosine envelope decays it to 0). Pure
+        # edge-holding does not converge; super-convergence needs the decay.
+        self.anneal = str(self.cfg.get("anneal", "none")).lower()
 
         self._lr = self.lr_init
+        self._base_edge_lr = self.lr_init
         self._lambda_ema: float | None = None
         self._probe_seconds = 0.0
         self.n_probes = 0
@@ -76,26 +82,40 @@ class EdgeLRController(Controller):
         self.n_probes += 1
         return max(out["lambda_max"], 1e-6)
 
+    def _envelope(self, step: int) -> float:
+        if self.anneal != "cosine":
+            return 1.0
+        total = self.total_epochs * self.steps_per_epoch
+        p = (step - self.warmup_steps) / max(total - self.warmup_steps, 1)
+        p = min(max(p, 0.0), 1.0)
+        return 0.5 * (1.0 + math.cos(math.pi * p))  # 1 -> 0 over the post-warmup run
+
     def begin_step(self, step: int) -> torch.optim.Optimizer:
-        # Linear LR warmup before edge control engages.
+        # Linear LR warmup before edge control engages (the ramp-up of one-cycle).
         if step < self.warmup_steps:
             self._set_lr(self.lr_init * (step + 1) / self.warmup_steps)
             return self._opt
 
+        lam = None
         if self._data is not None and step % self.check_every == 0:
             lam = self._probe_lambda_max()
             self._lambda_ema = lam if self._lambda_ema is None else (
                 self.lambda_beta * self._lambda_ema + (1 - self.lambda_beta) * lam
             )
             edge_lr = self.safety * (2.0 + 2.0 * self.momentum) / self._lambda_ema
-            self._set_lr(min(max(edge_lr, self.lr_min), self.lr_max))
+            self._base_edge_lr = min(max(edge_lr, self.lr_min), self.lr_max)
+
+        # The edge sets the peak; a cosine envelope anneals it toward 0.
+        self._set_lr(self._base_edge_lr * self._envelope(step))
+
+        if lam is not None:
             self.checks.append({
                 "step": step,
                 "epoch": round(self.epoch_of(step), 3),
                 "lambda_max": round(lam, 4),
                 "lambda_ema": round(self._lambda_ema, 4),
+                "base_edge_lr": round(self._base_edge_lr, 6),
                 "lr": round(self._lr, 6),
-                "edge_lr_raw": round(edge_lr, 6),
             })
         return self._opt
 
