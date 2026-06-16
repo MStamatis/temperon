@@ -1,0 +1,36 @@
+# Arm J: cyclic-catapult schedule (SGDR warm restarts) -- evolves OptiRoulette's
+# working ingredient (high-LR catapult) without the destructive switching.
+# Base-optimizer-agnostic: run the same with adam/adamw via
+#   --set controller.base_optimizer=adamw --set controller.lr=1.0e-3
+# Optional pool-per-restart: add a `pool:` list and a UCB bandit picks the
+# optimizer for each new cycle.
+run_name: arm_J_cyclic
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 0.0
+
+dataset:
+  name: cifar100
+
+augment:
+  enabled: true
+  cutout: 8
+
+model: resnet18
+
+controller:
+  type: cyclic_catapult
+  base_optimizer: sgd_momentum
+  lr: 0.1               # peak (catapult) lr per cycle
+  min_lr: 0.0
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 5.0e-4
+  n_cycles: 4           # equal-length cosine restarts over the run
+
+probes:
+  enabled: false
