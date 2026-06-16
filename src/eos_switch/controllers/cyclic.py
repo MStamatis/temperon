@@ -47,6 +47,9 @@ class _UCB:
 class CyclicCatapultController(Controller):
     def _build(self) -> None:
         self.n_cycles = int(self.cfg.get("n_cycles", 4))
+        # t_mult > 1 -> geometrically growing cycle lengths (SGDR classic): a
+        # long final cycle that anneals deeply (reaches high acc fast).
+        self.t_mult = float(self.cfg.get("t_mult", 1.0))
         self.min_lr = float(self.cfg.get("min_lr", 0.0))
         self.transfer_mode = str(self.cfg.get("state_transfer", "geometry"))
         self.loss_ema_beta = float(self.cfg.get("loss_ema_beta", 0.9))
@@ -70,6 +73,15 @@ class CyclicCatapultController(Controller):
         self._opt = self._make(self._name)
         self._bandit = _UCB(self.names, c=float(self.cfg.get("ucb_c", 2.0))) if len(self.names) > 1 else None
 
+        # cumulative end-fractions of each cycle over [0, 1] of training
+        w = [self.t_mult ** i for i in range(self.n_cycles)]
+        sw = sum(w)
+        acc = 0.0
+        self._cum = []
+        for wi in w:
+            acc += wi / sw
+            self._cum.append(acc)
+
         self._last_cycle = 0
         self._loss_ema: float | None = None
         self._cycle_start_loss: float | None = None
@@ -85,15 +97,16 @@ class CyclicCatapultController(Controller):
             nesterov=bool(s.get("nesterov", False)),
         )
 
-    def _cycle_len_steps(self) -> float:
-        total = self.total_epochs * max(self.steps_per_epoch, 1)
-        return max(total / self.n_cycles, 1.0)
-
     def _position(self, step: int):
-        cl = self._cycle_len_steps()
-        idx = min(int(step / cl), self.n_cycles - 1)
-        frac = (step - idx * cl) / cl
-        return idx, min(max(frac, 0.0), 1.0)
+        total = self.total_epochs * max(self.steps_per_epoch, 1)
+        p = min(max(step / max(total, 1), 0.0), 0.999999)
+        start = 0.0
+        for i, end in enumerate(self._cum):
+            if p < end or i == self.n_cycles - 1:
+                frac = (p - start) / max(end - start, 1e-9)
+                return i, min(max(frac, 0.0), 1.0)
+            start = end
+        return self.n_cycles - 1, 1.0
 
     def begin_step(self, step: int) -> torch.optim.Optimizer:
         idx, frac = self._position(step)

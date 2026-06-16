@@ -45,6 +45,15 @@ def test_base_optimizer_adamw():
     assert abs(ctrl.active_lr - 1e-3) < 1e-9
 
 
+def test_t_mult_growing_cycles():
+    # total=80 steps; t_mult=2, n=3 -> cycle end-fracs 1/7, 3/7, 1.0
+    ctrl = _ctrl(n_cycles=3, t_mult=2.0)
+    assert ctrl._position(0)[0] == 0
+    assert ctrl._position(11)[0] == 0   # 11/80=0.1375 < 1/7
+    assert ctrl._position(12)[0] == 1   # 0.15 in (1/7, 3/7)
+    assert ctrl._position(40)[0] == 2   # 0.5 in (3/7, 1) -> long final cycle
+
+
 def test_pool_per_restart_can_switch_optimizer():
     pool = [{"optimizer": "sgd_momentum", "lr": 0.1, "momentum": 0.9},
             {"optimizer": "adamw", "lr": 1e-3}]
