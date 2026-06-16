@@ -28,6 +28,10 @@ def build_controller(cfg: dict) -> Controller:
         from eos_switch.controllers.edge_lr import EdgeLRController  # arm H
 
         return EdgeLRController(cfg)
+    if kind == "adam_sgd_hybrid":
+        from eos_switch.controllers.hybrid import AdamSgdHybridController  # arm I
+
+        return AdamSgdHybridController(cfg)
     raise ValueError(f"unknown controller type {cfg['type']!r}")
 
 

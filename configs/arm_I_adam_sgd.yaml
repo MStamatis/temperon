@@ -1,0 +1,41 @@
+# Arm I: Adam->SGD one-cycle hybrid (SWATS-style), targeting super-convergence.
+# AdamW for fast early descent, hand off to SGD-momentum (cosine decay) for the
+# final generalization. Handoff on loss-EMA plateau or by handoff_frac cap.
+# Run at a SHORT horizon (e.g. --set epochs=50) to test "0.77 in fewer epochs".
+run_name: arm_I_adam_sgd
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 0.0
+
+dataset:
+  name: cifar100
+
+augment:
+  enabled: true
+  cutout: 8
+
+model: resnet18
+
+controller:
+  type: adam_sgd_hybrid
+  adam:
+    optimizer: adamw
+    lr: 1.0e-3
+    weight_decay: 0.01
+  sgd:
+    lr: 0.1
+    momentum: 0.9
+    nesterov: true
+    weight_decay: 5.0e-4
+    min_lr: 0.0
+  handoff_frac: 0.3        # hand off to SGD by 30% of training (cap)...
+  plateau_window: 3        # ...or earlier if AdamW's loss-EMA plateaus
+  plateau_delta: 0.01
+  state_transfer: geometry # Adam m -> SGD momentum buffer
+
+probes:
+  enabled: false
