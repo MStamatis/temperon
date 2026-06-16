@@ -1,0 +1,35 @@
+# Strong-SGD baseline on ResNet-110 = the SAME cyclic controller with a SINGLE
+# cycle (n_cycles=1) -> warmup + one cosine = the standard strong SGD recipe.
+# Same code path as arm_J_cyclic_r110 for a fair head-to-head.
+run_name: arm_strong_sgd_r110
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 0.0
+
+dataset:
+  name: cifar100
+
+augment:
+  enabled: true
+  cutout: 8
+
+model: resnet110
+
+controller:
+  type: cyclic_catapult
+  base_optimizer: sgd_momentum
+  lr: 0.1
+  min_lr: 0.0
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 5.0e-4
+  n_cycles: 1            # single cosine cycle = strong SGD recipe
+  t_mult: 1.0
+  warmup_steps: 200
+
+probes:
+  enabled: false

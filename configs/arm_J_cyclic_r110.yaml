@@ -1,0 +1,36 @@
+# arm J cyclic-catapult on ResNet-110 (paper architecture) -- fair comparison
+# with OptiRoulette's headline (0.65@ep18.8, 0.75@ep30.4 on ResNet-110).
+# Winning R18 config: growing cycles (t_mult=2, n_cycles=4) + warmup for the
+# deep net's cold start.
+run_name: arm_J_cyclic_r110
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 0.0
+
+dataset:
+  name: cifar100
+
+augment:
+  enabled: true
+  cutout: 8
+
+model: resnet110
+
+controller:
+  type: cyclic_catapult
+  base_optimizer: sgd_momentum
+  lr: 0.1
+  min_lr: 0.0
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 5.0e-4
+  n_cycles: 4
+  t_mult: 2.0
+  warmup_steps: 200      # protect ResNet-110's cold start at lr 0.1
+
+probes:
+  enabled: false

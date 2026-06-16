@@ -51,6 +51,9 @@ class CyclicCatapultController(Controller):
         # long final cycle that anneals deeply (reaches high acc fast).
         self.t_mult = float(self.cfg.get("t_mult", 1.0))
         self.min_lr = float(self.cfg.get("min_lr", 0.0))
+        # Optional linear LR warmup at the very start (deep nets like ResNet-110
+        # can diverge if the first cycle starts cold at the peak lr).
+        self.warmup_steps = int(self.cfg.get("warmup_steps", 0))
         self.transfer_mode = str(self.cfg.get("state_transfer", "geometry"))
         self.loss_ema_beta = float(self.cfg.get("loss_ema_beta", 0.9))
 
@@ -115,6 +118,8 @@ class CyclicCatapultController(Controller):
             self._last_cycle = idx
         peak = float(self.specs[self._name]["lr"])
         lr = self.min_lr + 0.5 * (peak - self.min_lr) * (1 + math.cos(math.pi * frac))
+        if step < self.warmup_steps:  # linear ramp overrides the first cycle's start
+            lr = peak * (step + 1) / self.warmup_steps
         for g in self._opt.param_groups:
             g["lr"] = lr
         return self._opt
