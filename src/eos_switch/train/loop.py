@@ -58,7 +58,14 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
         torch.backends.cudnn.allow_tf32 = True
 
     ds_cfg = cfg["dataset"]
-    data = GPUCifar(ds_cfg["name"], device=device, smoke_subset=ds_cfg.get("smoke_subset"))
+    data = GPUCifar(
+        ds_cfg["name"],
+        device=device,
+        smoke_subset=ds_cfg.get("smoke_subset"),
+        val_split=ds_cfg.get("validation_split"),
+        val_seed=int(ds_cfg.get("val_seed", 42)),
+        color_jitter=float(cfg.get("augment", {}).get("color_jitter", 0.0)),
+    )
     model = build_model(cfg["model"], data.num_classes).to(device)
     if is_cuda:
         model = model.to(memory_format=torch.channels_last)
@@ -176,6 +183,7 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
         "device": str(device),
         "model": cfg["model"],
         "dataset": ds_cfg["name"],
+        "eval_set": data.eval_name,
         "epochs": epochs,
         "final_val_acc": round(val_acc, 4),
         "best_val_acc": round(best_val_acc, 4),

@@ -1,0 +1,38 @@
+# Matched-to-OptiRoulette setup: strong-SGD baseline = the SAME cyclic
+# controller with a single cycle (n_cycles=1 -> warmup + one cosine). Identical
+# data pipeline to match_cyclic.yaml for a fair head-to-head.
+run_name: match_strong
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+
+dataset:
+  name: cifar100
+  validation_split: 0.1
+  val_seed: 42
+
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+
+model: resnet18
+
+controller:
+  type: cyclic_catapult
+  base_optimizer: sgd_momentum
+  lr: 0.1
+  min_lr: 0.0
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 5.0e-4
+  n_cycles: 1
+  t_mult: 1.0
+  warmup_steps: 200
+
+probes:
+  enabled: false

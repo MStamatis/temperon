@@ -2,7 +2,7 @@
 
 import torch
 
-from eos_switch.data.cifar import _cutout, _random_crop, _random_flip
+from eos_switch.data.cifar import _color_jitter, _cutout, _random_crop, _random_flip
 
 
 def _gen(seed: int = 0) -> torch.Generator:
@@ -33,6 +33,27 @@ def test_random_flip_preserves_pixels():
         same = torch.equal(out[i], x[i].float())
         flipped = torch.equal(out[i], x[i].float().flip(-1))
         assert same or flipped
+
+
+def test_color_jitter_range_and_shape():
+    x = torch.rand(8, 3, 32, 32)
+    out = _color_jitter(x, 0.1, 0.1, 0.1, gen=_gen(0))
+    assert out.shape == x.shape
+    assert out.min() >= 0.0 and out.max() <= 1.0  # clamped to [0,1]
+    assert not torch.equal(out, x)  # something changed
+
+
+def test_color_jitter_deterministic_given_seed():
+    x = torch.rand(4, 3, 32, 32)
+    a = _color_jitter(x.clone(), 0.1, 0.1, 0.1, gen=_gen(3))
+    b = _color_jitter(x.clone(), 0.1, 0.1, 0.1, gen=_gen(3))
+    assert torch.allclose(a, b)
+
+
+def test_color_jitter_zero_strength_is_identity():
+    x = torch.rand(4, 3, 32, 32)
+    out = _color_jitter(x.clone(), 0.0, 0.0, 0.0, gen=_gen(1))
+    assert torch.allclose(out, x.clamp(0, 1))
 
 
 def test_cutout_zeroes_a_square():

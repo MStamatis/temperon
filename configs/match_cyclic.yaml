@@ -1,0 +1,39 @@
+# Matched-to-OptiRoulette setup: cyclic-catapult (cyclic-J). Data pipeline and
+# training knobs replicate the OptiRoulette framework's CIFAR-100 config:
+# random crop + flip + cutout 8 + color_jitter 0.1 + 90/10 held-out val split +
+# grad clip 2.0. model is set per run (resnet18 / resnet110) via --set.
+run_name: match_cyclic
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+
+dataset:
+  name: cifar100
+  validation_split: 0.1      # train on 90%, eval on held-out 10% of train
+  val_seed: 42
+
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+
+model: resnet18
+
+controller:
+  type: cyclic_catapult
+  base_optimizer: sgd_momentum
+  lr: 0.1
+  min_lr: 0.0
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 5.0e-4
+  n_cycles: 4
+  t_mult: 2.0
+  warmup_steps: 200
+
+probes:
+  enabled: false
