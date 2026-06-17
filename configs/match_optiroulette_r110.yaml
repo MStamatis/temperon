@@ -1,0 +1,31 @@
+# Real (patched) OptiRoulette on ResNet-110 with the framework-matched data
+# pipeline -- a faithful reproduction of the paper's CIFAR-100 run in our
+# harness. Tests whether OptiRoulette's pool+warmup genuinely reaches 0.75
+# (its headline) where single-optimizer SGD (cyclic / cosine) caps at ~0.74.
+run_name: match_optiroulette_r110
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+
+dataset:
+  name: cifar100
+  validation_split: 0.1
+  val_seed: 42
+
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+
+model: resnet110
+
+controller:
+  type: optiroulette
+  warmup: true            # default profile: 17-epoch SGD warmup then roulette
+
+probes:
+  enabled: false
