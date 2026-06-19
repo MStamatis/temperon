@@ -36,6 +36,10 @@ def build_controller(cfg: dict) -> Controller:
         from eos_switch.controllers.cyclic import CyclicCatapultController  # arm J
 
         return CyclicCatapultController(cfg)
+    if kind == "eos_restart":
+        from eos_switch.controllers.eos_restart import EosRestartController  # arm K
+
+        return EosRestartController(cfg)
     raise ValueError(f"unknown controller type {cfg['type']!r}")
 
 
