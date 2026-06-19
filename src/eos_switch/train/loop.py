@@ -66,7 +66,12 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
         val_seed=int(ds_cfg.get("val_seed", 42)),
         color_jitter=float(cfg.get("augment", {}).get("color_jitter", 0.0)),
     )
-    model = build_model(cfg["model"], data.num_classes).to(device)
+    model = build_model(
+        cfg["model"],
+        data.num_classes,
+        initial_channels=cfg.get("initial_channels"),
+        bn_momentum=float(cfg.get("bn_momentum", 0.1)),
+    ).to(device)
     if is_cuda:
         model = model.to(memory_format=torch.channels_last)
 

@@ -22,17 +22,17 @@ def _conv3x3(in_planes: int, out_planes: int, stride: int = 1) -> nn.Conv2d:
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, in_planes: int, planes: int, stride: int = 1) -> None:
+    def __init__(self, in_planes: int, planes: int, stride: int = 1, bn_momentum: float = 0.1) -> None:
         super().__init__()
         self.conv1 = _conv3x3(in_planes, planes, stride)
-        self.bn1 = nn.BatchNorm2d(planes)
+        self.bn1 = nn.BatchNorm2d(planes, momentum=bn_momentum)
         self.conv2 = _conv3x3(planes, planes)
-        self.bn2 = nn.BatchNorm2d(planes)
+        self.bn2 = nn.BatchNorm2d(planes, momentum=bn_momentum)
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != planes:
             self.shortcut = nn.Sequential(
                 nn.Conv2d(in_planes, planes, 1, stride=stride, bias=False),
-                nn.BatchNorm2d(planes),
+                nn.BatchNorm2d(planes, momentum=bn_momentum),
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -44,16 +44,17 @@ class BasicBlock(nn.Module):
 class CifarResNet(nn.Module):
     """Generic CIFAR ResNet over a list of (width, num_blocks, stride) stages."""
 
-    def __init__(self, stages: list[tuple[int, int, int]], stem_width: int, num_classes: int) -> None:
+    def __init__(self, stages: list[tuple[int, int, int]], stem_width: int, num_classes: int,
+                 bn_momentum: float = 0.1) -> None:
         super().__init__()
         self.conv1 = _conv3x3(3, stem_width)
-        self.bn1 = nn.BatchNorm2d(stem_width)
+        self.bn1 = nn.BatchNorm2d(stem_width, momentum=bn_momentum)
         layers: list[nn.Module] = []
         in_planes = stem_width
         for width, num_blocks, stride in stages:
             strides = [stride] + [1] * (num_blocks - 1)
             for s in strides:
-                layers.append(BasicBlock(in_planes, width, s))
+                layers.append(BasicBlock(in_planes, width, s, bn_momentum=bn_momentum))
                 in_planes = width
         self.layers = nn.Sequential(*layers)
         self.head = nn.Linear(in_planes, num_classes)
@@ -89,18 +90,26 @@ class SmallCNN(nn.Module):
         return self.head(out)
 
 
-def build_model(name: str, num_classes: int) -> nn.Module:
+def build_model(
+    name: str,
+    num_classes: int,
+    initial_channels: int | None = None,
+    bn_momentum: float = 0.1,
+) -> nn.Module:
     name = name.lower()
     if name == "smallcnn":
         return SmallCNN(num_classes)
     if name == "resnet18":
         stages = [(64, 2, 1), (128, 2, 2), (256, 2, 2), (512, 2, 2)]
-        return CifarResNet(stages, stem_width=64, num_classes=num_classes)
+        return CifarResNet(stages, stem_width=64, num_classes=num_classes, bn_momentum=bn_momentum)
     if name.startswith("resnet"):
         depth = int(name.removeprefix("resnet"))
         if (depth - 2) % 6 != 0:
             raise ValueError(f"CIFAR ResNet depth must satisfy depth=6n+2, got {depth}")
         n = (depth - 2) // 6
-        stages = [(16, n, 1), (32, n, 2), (64, n, 2)]
-        return CifarResNet(stages, stem_width=16, num_classes=num_classes)
+        # CIFAR ResNet stem width: 16 (He et al. standard) unless overridden.
+        # The OptiRoulette framework uses initial_channels=64 (a much wider net).
+        c = initial_channels or 16
+        stages = [(c, n, 1), (2 * c, n, 2), (4 * c, n, 2)]
+        return CifarResNet(stages, stem_width=c, num_classes=num_classes, bn_momentum=bn_momentum)
     raise ValueError(f"unknown model {name!r}")

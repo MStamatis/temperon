@@ -22,6 +22,8 @@ augment:
   color_jitter: 0.1
 
 model: resnet110
+initial_channels: 64      # WIDE ResNet-110 (~28M), matching the framework config
+bn_momentum: 0.01         # framework uses BN momentum 0.01 (not the 0.1 default)
 
 controller:
   type: optiroulette
