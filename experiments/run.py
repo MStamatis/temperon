@@ -45,6 +45,9 @@ def apply_smoke_overrides(cfg: dict) -> dict:
         # Pull warmup inside the 3-epoch horizon so warm restarts (and the SAM
         # two-pass at the catapult) get exercised in the smoke run.
         ctrl["warmup_steps"] = min(int(ctrl.get("warmup_steps", 200)), 20)
+        # Shrink the EoS-rho probe cadence so stage-2 rho adaptation fires too.
+        if ctrl.get("eos_rho", False):
+            ctrl["check_every"] = min(int(ctrl.get("check_every", 50)), 10)
     probes = cfg.get("probes", {})
     if probes.get("enabled", False):
         probes["probe_every"] = min(int(probes.get("probe_every", 50)), 20)
