@@ -1,0 +1,45 @@
+# arm L (stage 1): SAM + cyclic-catapult on WIDE ResNet-110, matched to the
+# cyclic-J reference (configs/match_cyclic.yaml + wide-R110 knobs baked in:
+# initial_channels=64, bn_momentum=0.01). SAM adds a second forward/backward per
+# step (sharpness-aware ascent, fixed rho) on top of the proven cosine warm-
+# restart schedule -> ~2x wall-clock/epoch vs cyclic-J. Head-to-head target:
+# cyclic-J first-hit 0.65@ep15, 0.70@ep16, 0.75@ep41, best/final 0.793.
+run_name: arm_L
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+
+model: resnet110
+initial_channels: 64
+bn_momentum: 0.01
+
+dataset:
+  name: cifar100
+  validation_split: 0.1      # train on 90%, eval on held-out 10% of train
+  val_seed: 42
+
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+
+controller:
+  type: sam_catapult
+  base_optimizer: sgd_momentum
+  lr: 0.1
+  min_lr: 0.0
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 5.0e-4
+  n_cycles: 4
+  t_mult: 2.0
+  warmup_steps: 200
+  rho: 0.05                  # fixed SAM radius (stage 1); stage 2 makes it EoS-adaptive
+  sam_freeze_bn: false       # standard SAM: BN updates on both passes
+
+probes:
+  enabled: false

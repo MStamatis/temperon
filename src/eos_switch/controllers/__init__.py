@@ -40,6 +40,10 @@ def build_controller(cfg: dict) -> Controller:
         from eos_switch.controllers.eos_restart import EosRestartController  # arm K
 
         return EosRestartController(cfg)
+    if kind == "sam_catapult":
+        from eos_switch.controllers.sam_catapult import SamCatapultController  # arm L
+
+        return SamCatapultController(cfg)
     raise ValueError(f"unknown controller type {cfg['type']!r}")
 
 

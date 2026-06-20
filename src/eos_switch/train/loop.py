@@ -11,6 +11,7 @@ Precision policy (research-critical):
 from __future__ import annotations
 
 import time
+from contextlib import nullcontext
 from pathlib import Path
 
 import torch
@@ -18,6 +19,7 @@ import torch.nn.functional as F
 
 from eos_switch.controllers import build_controller
 from eos_switch.data import GPUCifar
+from eos_switch.probes.hvp import preserve_bn_stats
 from eos_switch.report.logging import MilestoneTracker, RunLogger
 from eos_switch.train.models import build_model
 from eos_switch.train.seed import make_generator, set_seed
@@ -140,9 +142,34 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
                 logits = train_model(x)
                 loss = loss_fn(logits, y)
             loss.backward()
-            if grad_clip > 0:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-            opt.step()
+            if getattr(controller, "sam", False):
+                # SAM (arm L): perturb to the local worst case, recompute the
+                # gradient there, then step from the original weights with that
+                # perturbed-point gradient. grad_clip applies to the UPDATE
+                # gradient (2nd pass); loss_val below reports the clean loss.
+                opt.first_step()
+                # When freezing BN, the perturbed pass must not leave a trace in
+                # the running stats. preserve_bn_stats restores them on __exit__,
+                # so the backward must run INSIDE the context (restore after it)
+                # to avoid an inplace-version conflict on the BN buffers.
+                bn_ctx = (
+                    preserve_bn_stats(model)
+                    if getattr(controller, "sam_freeze_bn", False)
+                    else nullcontext()
+                )
+                with bn_ctx:
+                    with torch.autocast(
+                        device.type, dtype=torch.bfloat16, enabled=autocast_enabled
+                    ):
+                        loss2 = loss_fn(train_model(x), y)
+                    loss2.backward()
+                if grad_clip > 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                opt.second_step()
+            else:
+                if grad_clip > 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                opt.step()
 
             loss_val = loss.item()
             controller.end_step(global_step, loss_val)
