@@ -101,3 +101,83 @@ def test_schedule_matches_cyclic():
         sam.begin_step(step)
         cyc.begin_step(step)
         assert abs(sam.active_lr - cyc.active_lr) < 1e-9
+
+
+# --- stage 2: EoS-coupled rho ------------------------------------------------
+
+def _eos_ctrl(model=None, **over):
+    # warmup_steps=0 so checks engage immediately; sharp_ema_beta=0 -> ema is the
+    # latest sharpness (deterministic); peak basis -> lr_basis is constant.
+    cfg = {"type": "sam_catapult", "base_optimizer": "sgd_momentum", "lr": 0.1,
+           "min_lr": 0.0, "n_cycles": 4, "rho": 0.05, "eos_rho": True,
+           "warmup_steps": 0, "check_every": 10, "rho_min": 0.01, "rho_max": 0.20,
+           "sharp_ema_beta": 0.0, "edge_lr_basis": "peak"}
+    cfg.update(over)
+    ctrl = build_controller(cfg)
+    ctrl.setup(model if model is not None else nn.Linear(8, 4),
+               steps_per_epoch=10, total_epochs=8)
+    ctrl._data = object()  # non-None so begin_step's probe guard passes
+    return ctrl
+
+
+def test_eos_rho_auto_calibrates_to_base_on_first_probe():
+    ctrl = _eos_ctrl()
+    ctrl._probe_sharpness = lambda: 5.0
+    opt = ctrl.begin_step(10)  # first check anchors target_ratio -> rho == base
+    assert abs(ctrl._cur_rho - ctrl.base_rho) < 1e-9
+    assert abs(opt.rho - ctrl.base_rho) < 1e-9
+    assert abs(ctrl.target_ratio - 5.0 / ((2 + 2 * 0.9) / 0.1)) < 1e-9
+
+
+def test_eos_rho_larger_when_flatter_smaller_when_sharper():
+    ctrl = _eos_ctrl()
+    sharp = {"v": 5.0}
+    ctrl._probe_sharpness = lambda: sharp["v"]
+    ctrl.begin_step(10)            # anchor at sharp=5 -> rho == base
+    base = ctrl.base_rho
+    sharp["v"] = 2.5               # flatter (further from edge) -> rho grows
+    ctrl.begin_step(20)
+    assert ctrl._cur_rho > base
+    assert abs(ctrl._cur_rho - 2 * base) < 1e-9
+    sharp["v"] = 10.0              # sharper (nearer the edge) -> rho shrinks
+    ctrl.begin_step(30)
+    assert ctrl._cur_rho < base
+
+
+def test_eos_rho_clamped_to_bounds():
+    ctrl = _eos_ctrl(rho_min=0.02, rho_max=0.08)
+    sharp = {"v": 5.0}
+    ctrl._probe_sharpness = lambda: sharp["v"]
+    ctrl.begin_step(10)            # anchor rho == base (0.05)
+    sharp["v"] = 1e-4             # near-flat -> huge rho -> clamp to rho_max
+    ctrl.begin_step(20)
+    assert abs(ctrl._cur_rho - 0.08) < 1e-9
+    sharp["v"] = 1e4             # very sharp -> tiny rho -> clamp to rho_min
+    ctrl.begin_step(30)
+    assert abs(ctrl._cur_rho - 0.02) < 1e-9
+
+
+def test_eos_rho_negative_curvature_uses_rho_min():
+    ctrl = _eos_ctrl()
+    sharp = {"v": 5.0}
+    ctrl._probe_sharpness = lambda: sharp["v"]
+    ctrl.begin_step(10)            # anchor on positive curvature
+    sharp["v"] = -3.0            # non-convex noise, not a basin -> rho_min
+    ctrl.begin_step(20)
+    assert abs(ctrl._cur_rho - ctrl.rho_min) < 1e-9
+
+
+def test_eos_rho_disabled_keeps_fixed_rho_and_no_checks():
+    ctrl = _eos_ctrl(eos_rho=False)
+    ctrl._probe_sharpness = lambda: 999.0  # must never be consulted
+    opt = ctrl.begin_step(10)
+    assert opt.rho == 0.05
+    assert ctrl.checks == []
+
+
+def test_eos_rho_current_basis_rides_lr():
+    # With the "current" basis, a lower live lr lifts the threshold and thus rho.
+    ctrl = _eos_ctrl(edge_lr_basis="current", warmup_steps=0)
+    ctrl._probe_sharpness = lambda: 4.0
+    ctrl.begin_step(10)
+    assert ctrl.checks[-1]["lr_basis"] == round(ctrl.active_lr, 6)

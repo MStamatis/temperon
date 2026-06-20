@@ -1,0 +1,55 @@
+# arm L (stage 2): EoS-coupled SAM radius on WIDE ResNet-110, matched to the
+# cyclic-J / arm-L reference. rho is retuned from batch_sharpness every
+# check_every steps: rho = base_rho * clamp(target_ratio/edge_ratio, ...), with
+# target_ratio auto-calibrated to the first probe (rho starts at base_rho).
+# This variant uses the FIXED cycle PEAK lr in edge_ratio -> rho tracks
+# curvature only, decoupled from the deterministic cosine sweep.
+# Head-to-head: arm-L fixed-rho (final ~0.801, 0.75@~ep39), cyclic-J (0.793).
+run_name: arm_L2_peak
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+
+model: resnet110
+initial_channels: 64
+bn_momentum: 0.01
+
+dataset:
+  name: cifar100
+  validation_split: 0.1      # train on 90%, eval on held-out 10% of train
+  val_seed: 42
+
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+
+controller:
+  type: sam_catapult
+  base_optimizer: sgd_momentum
+  lr: 0.1
+  min_lr: 0.0
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 5.0e-4
+  n_cycles: 4
+  t_mult: 2.0
+  warmup_steps: 200
+  rho: 0.05                  # base_rho: anchor where rho == base (auto-calibrated)
+  sam_freeze_bn: false
+  # --- stage 2: EoS-coupled rho ---
+  eos_rho: true
+  edge_lr_basis: peak        # fixed cycle peak lr in edge_ratio (curvature-only)
+  rho_min: 0.01
+  rho_max: 0.20
+  target_ratio: auto         # anchor to the first valid probe's edge_ratio
+  check_every: 50
+  micro_batch: 128
+  sharp_ema_beta: 0.6
+
+probes:
+  enabled: false
