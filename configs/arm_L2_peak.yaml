@@ -1,9 +1,12 @@
 # arm L (stage 2): EoS-coupled SAM radius on WIDE ResNet-110, matched to the
 # cyclic-J / arm-L reference. rho is retuned from batch_sharpness every
-# check_every steps: rho = base_rho * clamp(target_ratio/edge_ratio, ...), with
-# target_ratio auto-calibrated to the first probe (rho starts at base_rho).
-# This variant uses the FIXED cycle PEAK lr in edge_ratio -> rho tracks
-# curvature only, decoupled from the deterministic cosine sweep.
+# check_every steps: rho = base_rho * clamp(target_ratio/edge_ratio, ...).
+# target_ratio = 1.0 = the EoS edge (edge_ratio is dimensionless, edge at 1 by
+# construction): rho == base AT the edge, larger inside the stability region,
+# smaller past it. (The first run auto-anchored to the first probe, which pinned
+# rho to the floor for 74% of training because sharpness grows ~30x; anchoring at
+# the edge fixes that.) This variant uses the FIXED cycle PEAK lr in edge_ratio
+# -> rho tracks curvature only, decoupled from the deterministic cosine sweep.
 # Head-to-head: arm-L fixed-rho (final ~0.801, 0.75@~ep39), cyclic-J (0.793).
 run_name: arm_L2_peak
 seed: 42
@@ -46,8 +49,8 @@ controller:
   edge_lr_basis: peak        # fixed cycle peak lr in edge_ratio (curvature-only)
   rho_min: 0.01
   rho_max: 0.20
-  target_ratio: auto         # anchor to the first valid probe's edge_ratio
-  check_every: 50
+  target_ratio: 1.0          # anchor at the EoS edge (rho == base at edge_ratio=1)
+  check_every: 100
   micro_batch: 128
   sharp_ema_beta: 0.6
 

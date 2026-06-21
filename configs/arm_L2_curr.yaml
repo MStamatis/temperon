@@ -1,7 +1,8 @@
 # arm L (stage 2): EoS-coupled SAM radius -- "current lr" variant. Same as
-# arm_L2_peak but edge_ratio uses the LIVE within-cycle lr (the true momentum-
-# SGD edge condition, as in eos_restart). Consequence: rho also rides the cosine
-# sweep -- large near a restart's tail (lr -> 0), small just after a catapult.
+# arm_L2_peak (target_ratio = 1.0 = the EoS edge) but edge_ratio uses the LIVE
+# within-cycle lr (the true momentum-SGD edge condition, as in eos_restart).
+# Consequence: rho also rides the cosine sweep -- large near a restart's tail
+# (lr -> 0), small just after a catapult.
 run_name: arm_L2_curr
 seed: 42
 device: auto
@@ -43,8 +44,8 @@ controller:
   edge_lr_basis: current     # live within-cycle lr in edge_ratio (true edge)
   rho_min: 0.01
   rho_max: 0.20
-  target_ratio: auto         # anchor to the first valid probe's edge_ratio
-  check_every: 50
+  target_ratio: 1.0          # anchor at the EoS edge (rho == base at edge_ratio=1)
+  check_every: 100
   micro_batch: 128
   sharp_ema_beta: 0.6
 

@@ -175,6 +175,16 @@ def test_eos_rho_disabled_keeps_fixed_rho_and_no_checks():
     assert ctrl.checks == []
 
 
+def test_eos_rho_fixed_target_ratio_respected():
+    # A fixed target_ratio (the EoS edge = 1.0) must NOT be overwritten by the
+    # first probe, and rho == base when edge_ratio == target_ratio.
+    ctrl = _eos_ctrl(target_ratio=1.0)
+    ctrl._probe_sharpness = lambda: 38.0  # edge_ratio = 38*0.1/(2+2*0.9) = 1.0
+    ctrl.begin_step(10)
+    assert ctrl.target_ratio == 1.0
+    assert abs(ctrl._cur_rho - ctrl.base_rho) < 1e-9
+
+
 def test_eos_rho_current_basis_rides_lr():
     # With the "current" basis, a lower live lr lifts the threshold and thus rho.
     ctrl = _eos_ctrl(edge_lr_basis="current", warmup_steps=0)
