@@ -1,0 +1,45 @@
+# arm L control: FIXED SAM radius rho=0.10 (eos_rho off). Attribution control for
+# stage 2 -- the EoS-coupled "curr" variant saturated rho to rho_max=0.20 for 94%
+# of training, so its win over fixed rho=0.05 may just be "a bigger radius helps".
+# These fixed-rho=0.10/0.20 runs disentangle radius-value from EoS-adaptation.
+# Head-to-head: EoS-curr final 0.8113, EoS-peak 0.8049, fixed-0.05 0.8010, cyclic-J 0.7928.
+run_name: arm_L_rho010
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+
+model: resnet110
+initial_channels: 64
+bn_momentum: 0.01
+
+dataset:
+  name: cifar100
+  validation_split: 0.1      # train on 90%, eval on held-out 10% of train
+  val_seed: 42
+
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+
+controller:
+  type: sam_catapult
+  base_optimizer: sgd_momentum
+  lr: 0.1
+  min_lr: 0.0
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 5.0e-4
+  n_cycles: 4
+  t_mult: 2.0
+  warmup_steps: 200
+  rho: 0.10                  # FIXED radius (eos_rho off -> no adaptation)
+  sam_freeze_bn: false
+  eos_rho: false
+
+probes:
+  enabled: false
