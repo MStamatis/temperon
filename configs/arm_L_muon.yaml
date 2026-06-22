@@ -1,0 +1,55 @@
+# arm L variant: SAM + cyclic-catapult on a MUON base (Newton-Schulz orthogonalized
+# updates) instead of SGD-momentum. SAM is optimizer-agnostic (perturbs in raw-
+# gradient weight space, then Muon orthogonalizes the perturbed-point gradient).
+# Muon handles 2D+ weights via Newton-Schulz and falls back to plain momentum-SGD
+# for 1D params (biases/BN) in a single group -- a simplification vs the canonical
+# "Muon for matrices + AdamW for the rest" recipe.
+#
+# WARNING -- this needs its own tuning before the 3-seed run:
+#   * lr: Muon's scale is ~0.02 (NOT SGD's 0.1). Sweep controller.lr first
+#     (e.g. 0.01,0.02,0.05) on 1 seed and pick the best.
+#   * weight_decay is DECOUPLED here (p *= 1-lr*wd); 5e-4 is conservative and may
+#     be too weak -- consider sweeping if final acc underwhelms.
+#   * rho is fixed (eos_rho off: the EoS-coupling added nothing for SGD). 0.05 is
+#     a start; SGD preferred ~0.20, but Muon's geometry may differ.
+# Reference to beat: SAM+SGD-catapult final 0.811 (rho=0.20), cyclic-J 0.793.
+run_name: arm_L_muon
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+
+model: resnet110
+initial_channels: 64
+bn_momentum: 0.01
+
+dataset:
+  name: cifar100
+  validation_split: 0.1      # train on 90%, eval on held-out 10% of train
+  val_seed: 42
+
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+
+controller:
+  type: sam_catapult
+  base_optimizer: muon
+  lr: 0.05                   # PEAK lr -- SWEEP THIS (Muon scale ~0.02, not 0.1)
+  min_lr: 0.0
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 5.0e-4       # decoupled in Muon (p *= 1 - lr*wd)
+  n_cycles: 4
+  t_mult: 2.0
+  warmup_steps: 200
+  rho: 0.05                  # fixed SAM radius (eos_rho off)
+  sam_freeze_bn: false
+  eos_rho: false
+
+probes:
+  enabled: false

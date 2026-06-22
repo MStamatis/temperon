@@ -191,3 +191,26 @@ def test_eos_rho_current_basis_rides_lr():
     ctrl._probe_sharpness = lambda: 4.0
     ctrl.begin_step(10)
     assert ctrl.checks[-1]["lr_basis"] == round(ctrl.active_lr, 6)
+
+
+def test_sam_wraps_muon_base_two_pass_runs():
+    # SAM is optimizer-agnostic: wrap a Muon base and run the two-pass over both
+    # a 2D weight (Newton-Schulz path) and a 1D bias (momentum-SGD fallback).
+    from eos_switch.optimizers.muon import Muon
+
+    torch.manual_seed(0)
+    model = nn.Sequential(nn.Linear(16, 12), nn.ReLU(), nn.Linear(12, 4))
+    ctrl = build_controller({"type": "sam_catapult", "base_optimizer": "muon",
+                             "lr": 0.05, "min_lr": 0.0, "n_cycles": 4,
+                             "warmup_steps": 0, "rho": 0.05})
+    ctrl.setup(model, steps_per_epoch=10, total_epochs=8)
+    opt = ctrl.begin_step(20)
+    assert isinstance(opt.base_optimizer, Muon)
+    assert ctrl.active_name == "sam:muon"
+    w0 = [p.detach().clone() for p in model.parameters()]
+    x, y = torch.randn(32, 16), torch.randint(0, 4, (32,))
+    lf = nn.CrossEntropyLoss()
+    opt.zero_grad(); lf(model(x), y).backward(); opt.first_step()
+    opt.zero_grad(); lf(model(x), y).backward(); opt.second_step()
+    assert all(torch.isfinite(p).all() for p in model.parameters())
+    assert any((p - q).norm() > 1e-6 for p, q in zip(model.parameters(), w0))
