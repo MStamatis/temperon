@@ -1,0 +1,42 @@
+# Ablation C: PURE Muon -- single cosine (n_cycles=1, NO warm restarts/catapult),
+# NO SAM. The clean baseline: if this already reaches ~0.82, then BOTH SAM and the
+# catapult are window dressing and the story is just "Muon + good decoupled wd".
+# A (arm_J_muon, +catapult) vs C isolates the catapult's contribution to Muon.
+# wd swept 0.1/0.2/0.3. Reference: SAM+Muon-catapult 0.8226, cyclic-J (SGD) 0.793.
+run_name: arm_J_muon_nocat
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+
+model: resnet110
+initial_channels: 64
+bn_momentum: 0.01
+
+dataset:
+  name: cifar100
+  validation_split: 0.1
+  val_seed: 42
+
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+
+controller:
+  type: cyclic_catapult        # single cosine when n_cycles=1 -> NO catapult; no SAM
+  base_optimizer: muon
+  lr: 0.01
+  min_lr: 0.0
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 0.2            # decoupled; swept 0.1/0.2/0.3
+  n_cycles: 1                  # <-- single cosine, no warm restarts
+  t_mult: 1.0
+  warmup_steps: 200
+
+probes:
+  enabled: false
