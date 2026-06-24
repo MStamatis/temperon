@@ -5,14 +5,14 @@
 # for 1D params (biases/BN) in a single group -- a simplification vs the canonical
 # "Muon for matrices + AdamW for the rest" recipe.
 #
-# WARNING -- this needs its own tuning before the 3-seed run:
-#   * lr: Muon's scale is ~0.02 (NOT SGD's 0.1). Sweep controller.lr first
-#     (e.g. 0.01,0.02,0.05) on 1 seed and pick the best.
-#   * weight_decay is DECOUPLED here (p *= 1-lr*wd); 5e-4 is conservative and may
-#     be too weak -- consider sweeping if final acc underwhelms.
-#   * rho is fixed (eos_rho off: the EoS-coupling added nothing for SGD). 0.05 is
-#     a start; SGD preferred ~0.20, but Muon's geometry may differ.
-# Reference to beat: SAM+SGD-catapult final 0.811 (rho=0.20), cyclic-J 0.793.
+# TUNED RECIPE (3-seed confirmed): lr=0.01 (Muon scale, not SGD's 0.1) + decoupled
+# weight_decay=0.2 (Muon memorizes at low wd; 0.2 closes the overfit gap). This is
+# the PROJECT BEST: final 0.8226 (best 0.8236, sd 0.0011 over 3 seeds), beating
+# SAM+SGD-catapult (0.8111) by +1.15pp AND cyclic-J (0.7928) by +3.0pp, while
+# hitting 0.75 at epoch ~17 vs SGD's ~38 (~2.3x faster) -- highest final AND fastest.
+# Tuning history (seed42): lr sweep -> 0.01 best; wd sweep 5e-4/0.01/0.05/0.1/0.15/0.2
+# -> final 0.769/0.780/0.812/0.822/0.821/0.823, plateau from ~0.1 (wd=0.2 most robust
+# on 3 seeds). rho fixed (eos_rho off: the EoS-coupling added nothing for SGD).
 run_name: arm_L_muon
 seed: 42
 device: auto
@@ -39,11 +39,11 @@ augment:
 controller:
   type: sam_catapult
   base_optimizer: muon
-  lr: 0.05                   # PEAK lr -- SWEEP THIS (Muon scale ~0.02, not 0.1)
+  lr: 0.01                   # PEAK lr (3-seed tuned; Muon scale, not SGD's 0.1)
   min_lr: 0.0
   momentum: 0.9
   nesterov: true
-  weight_decay: 5.0e-4       # decoupled in Muon (p *= 1 - lr*wd)
+  weight_decay: 0.2          # decoupled in Muon (p *= 1 - lr*wd); closes overfit gap
   n_cycles: 4
   t_mult: 2.0
   warmup_steps: 200
