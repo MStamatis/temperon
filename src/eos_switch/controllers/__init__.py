@@ -44,6 +44,10 @@ def build_controller(cfg: dict) -> Controller:
         from eos_switch.controllers.sam_catapult import SamCatapultController  # arm L
 
         return SamCatapultController(cfg)
+    if kind == "sharp_muon_catapult":
+        from eos_switch.controllers.sharp_muon import SharpMuonCatapultController  # arm M
+
+        return SharpMuonCatapultController(cfg)
     raise ValueError(f"unknown controller type {cfg['type']!r}")
 
 

@@ -1,0 +1,47 @@
+# arm M (novelty): single-pass sharpness-aware Muon -- SPECTRAL mode. Muon-native:
+# two warm-started power iterations on the gradient matrix give its dominant
+# singular direction sigma*u v^T; perturb mat -> mat + rho*sigma*u v^T before
+# Newton-Schulz orthogonalization. NO second forward-backward. rho's SIGN is part
+# of the experiment (emphasize vs avoid the dominant gradient mode) -- sweep both.
+# Same wide-R110 + cyclic-catapult as the tuned SAM+Muon recipe (lr=0.01, wd=0.2).
+# Bar to match: SAM+Muon-catapult 0.8226. Baseline to beat: plain Muon 0.795.
+run_name: arm_M_sharpmuon_spectral
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+
+model: resnet110
+initial_channels: 64
+bn_momentum: 0.01
+
+dataset:
+  name: cifar100
+  validation_split: 0.1
+  val_seed: 42
+
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+
+controller:
+  type: sharp_muon_catapult
+  base_optimizer: muon
+  sharp_mode: spectral
+  rho: 0.5                    # dominant-mode perturbation strength; sign sweepable
+  spec_iters: 2
+  lr: 0.01
+  min_lr: 0.0
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 0.2
+  n_cycles: 4
+  t_mult: 2.0
+  warmup_steps: 200
+
+probes:
+  enabled: false

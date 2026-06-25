@@ -41,9 +41,9 @@ def apply_smoke_overrides(cfg: dict) -> dict:
         ctrl["warmup_steps"] = min(int(ctrl.get("warmup_steps", 200)), 20)
         ctrl["check_every"] = min(int(ctrl.get("check_every", 50)), 10)
         ctrl["cycle_epochs"] = min(float(ctrl.get("cycle_epochs", 20)), 1.0)
-    if ctrl.get("type") == "sam_catapult":
+    if ctrl.get("type") in ("sam_catapult", "sharp_muon_catapult"):
         # Pull warmup inside the 3-epoch horizon so warm restarts (and the SAM
-        # two-pass at the catapult) get exercised in the smoke run.
+        # two-pass / sharpness correction) get exercised in the smoke run.
         ctrl["warmup_steps"] = min(int(ctrl.get("warmup_steps", 200)), 20)
         # Shrink the EoS-rho probe cadence so stage-2 rho adaptation fires too.
         if ctrl.get("eos_rho", False):
