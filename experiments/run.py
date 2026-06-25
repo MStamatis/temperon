@@ -37,7 +37,7 @@ def apply_smoke_overrides(cfg: dict) -> dict:
     if ctrl.get("type") == "edge_lr":
         ctrl["warmup_steps"] = min(int(ctrl.get("warmup_steps", 200)), 20)
         ctrl["check_every"] = min(int(ctrl.get("check_every", 50)), 10)
-    if ctrl.get("type") == "eos_restart":
+    if ctrl.get("type") in ("eos_restart", "sam_eos_catapult"):
         ctrl["warmup_steps"] = min(int(ctrl.get("warmup_steps", 200)), 20)
         ctrl["check_every"] = min(int(ctrl.get("check_every", 50)), 10)
         ctrl["cycle_epochs"] = min(float(ctrl.get("cycle_epochs", 20)), 1.0)

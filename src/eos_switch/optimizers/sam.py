@@ -30,6 +30,12 @@ class SAM:
         self.base_optimizer = base_optimizer
         self.rho = float(rho)
         self.eps = float(eps)
+        # Free same-batch curvature byproduct (arm N): the two SAM gradients give
+        # a noise-free Hessian-vector product. second_step() fills last_sharpness
+        # with g_hat^T H g_hat = g^T H g / ||g||^2 (the batch_sharpness / EoS
+        # quantity) at zero extra cost. None until the first second_step().
+        self.last_sharpness: float | None = None
+        self._gnorm = 0.0
         # Alias the base optimizer's groups/state: LR scheduling and zero_grad
         # operate on the real parameters; e_w perturbations live alongside the
         # base optimizer's own per-parameter state.
@@ -56,7 +62,9 @@ class SAM:
     @torch.no_grad()
     def first_step(self, zero_grad: bool = True) -> None:
         """Climb to the local worst case w + rho * g / ||g|| and stash e_w."""
-        scale = self.rho / (self._grad_norm() + self.eps)
+        gnorm = self._grad_norm()
+        self._gnorm = float(gnorm)  # ||g||, kept for the free-sharpness estimate
+        scale = self.rho / (gnorm + self.eps)
         for group in self.param_groups:
             for p in group["params"]:
                 if p.grad is None:
@@ -69,13 +77,25 @@ class SAM:
 
     @torch.no_grad()
     def second_step(self, zero_grad: bool = False) -> None:
-        """Restore the original weights, then base-step with the perturbed grad."""
+        """Restore the original weights, then base-step with the perturbed grad.
+
+        Also records the FREE same-batch sharpness from the two gradients:
+        with e_w = rho * g/||g|| and the current grad g' (perturbed point),
+            <e_w, g'> = rho * g_hat^T g'
+            g_hat^T H g_hat ~= g_hat^T (g' - g) / rho = (<e_w,g'>/rho - ||g||)/rho
+        so last_sharpness = (<e_w, g'> - rho*||g||) / rho^2 (exact for quadratics).
+        """
+        dot = 0.0
         for group in self.param_groups:
             for p in group["params"]:
                 e_w = self.state[p].get("e_w") if p in self.state else None
                 if e_w is not None:
+                    if p.grad is not None:
+                        dot += float(torch.sum(e_w * p.grad))
                     p.sub_(e_w)
                     self.state[p]["e_w"] = None
+        rho = self.rho
+        self.last_sharpness = (dot - rho * self._gnorm) / (rho * rho + self.eps) if rho > 0 else None
         self.base_optimizer.step()
         if zero_grad:
             self.zero_grad(set_to_none=True)
