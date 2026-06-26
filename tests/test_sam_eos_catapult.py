@@ -26,9 +26,27 @@ def test_free_sharpness_exact_on_quadratic():
 
     opt.first_step()
     (0.5 * (a * w * w).sum()).backward()         # gradient at the perturbed point
+    opt.record_sharpness()                       # measure BEFORE any clipping
     opt.second_step()
 
     assert opt.last_sharpness == __import__("pytest").approx(expected, rel=1e-4)
+
+
+def test_clipping_after_record_does_not_bias_sharpness():
+    # record_sharpness must read the UNCLIPPED g'; clipping afterwards (as the
+    # loop does) must not change the recorded value.
+    torch.manual_seed(0)
+    a = torch.tensor([0.5, 2.0, 1.0, 4.0, 0.25])
+    w = nn.Parameter(torch.randn(5))
+    opt = SAM(torch.optim.SGD([w], lr=0.0), rho=0.1)
+    opt.zero_grad(); (0.5 * (a * w * w).sum()).backward()
+    opt.first_step()
+    (0.5 * (a * w * w).sum()).backward()
+    opt.record_sharpness()
+    recorded = opt.last_sharpness
+    torch.nn.utils.clip_grad_norm_([w], 0.01)    # aggressive clip AFTER record
+    assert opt.last_sharpness == recorded        # unchanged
+    assert recorded > 0                          # PSD Hessian -> positive
 
 
 def test_sharpness_none_before_step():

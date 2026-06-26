@@ -76,11 +76,13 @@ class SAM:
             self.zero_grad(set_to_none=True)
 
     @torch.no_grad()
-    def second_step(self, zero_grad: bool = False) -> None:
-        """Restore the original weights, then base-step with the perturbed grad.
+    def record_sharpness(self) -> None:
+        """Record the FREE same-batch sharpness from the two gradients. Call AFTER
+        the second backward and BEFORE any grad clipping -- clipping g' biases the
+        estimate negative (the clipped g' shrinks while ||g|| does not). Reads the
+        current grad g' and the stashed e_w; leaves weights/grads/e_w untouched.
 
-        Also records the FREE same-batch sharpness from the two gradients:
-        with e_w = rho * g/||g|| and the current grad g' (perturbed point),
+        With e_w = rho * g/||g|| and g' the perturbed-point gradient,
             <e_w, g'> = rho * g_hat^T g'
             g_hat^T H g_hat ~= g_hat^T (g' - g) / rho = (<e_w,g'>/rho - ||g||)/rho
         so last_sharpness = (<e_w, g'> - rho*||g||) / rho^2 (exact for quadratics).
@@ -89,13 +91,20 @@ class SAM:
         for group in self.param_groups:
             for p in group["params"]:
                 e_w = self.state[p].get("e_w") if p in self.state else None
-                if e_w is not None:
-                    if p.grad is not None:
-                        dot += float(torch.sum(e_w * p.grad))
-                    p.sub_(e_w)
-                    self.state[p]["e_w"] = None
+                if e_w is not None and p.grad is not None:
+                    dot += float(torch.sum(e_w * p.grad))
         rho = self.rho
         self.last_sharpness = (dot - rho * self._gnorm) / (rho * rho + self.eps) if rho > 0 else None
+
+    @torch.no_grad()
+    def second_step(self, zero_grad: bool = False) -> None:
+        """Restore the original weights, then base-step with the perturbed grad."""
+        for group in self.param_groups:
+            for p in group["params"]:
+                e_w = self.state[p].get("e_w") if p in self.state else None
+                if e_w is not None:
+                    p.sub_(e_w)
+                    self.state[p]["e_w"] = None
         self.base_optimizer.step()
         if zero_grad:
             self.zero_grad(set_to_none=True)

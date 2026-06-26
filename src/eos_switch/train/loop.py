@@ -163,6 +163,11 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
                     ):
                         loss2 = loss_fn(train_model(x), y)
                     loss2.backward()
+                # Record the free same-batch sharpness from the UNCLIPPED g'
+                # (clipping below would bias it negative). arm N reads it to time
+                # catapults; harmless (a scalar) for other SAM arms.
+                if hasattr(opt, "record_sharpness"):
+                    opt.record_sharpness()
                 if grad_clip > 0:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
                 opt.second_step()
