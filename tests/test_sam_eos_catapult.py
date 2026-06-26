@@ -75,18 +75,51 @@ def test_edge_ratio_reads_free_sharpness():
     assert edge == __import__("pytest").approx(0.5, rel=1e-6)   # 19 / 38
 
 
-def test_low_sharpness_triggers_restart():
-    # In-window, after the dwell, a low edge ratio must fire a catapult restart.
-    ctrl = build_controller({"type": "sam_eos_catapult", "lr": 0.1, "momentum": 0.9,
-                             "rho": 0.05, "warmup_steps": 0, "check_every": 1,
-                             "restart_ratio": 0.1, "min_dwell_checks": 0,
-                             "cycle_epochs": 5.0, "switch_until_frac": 0.9})
+def _robust_ctrl(**over):
+    cfg = {"type": "sam_eos_catapult", "base_optimizer": "muon", "lr": 0.01,
+           "momentum": 0.9, "rho": 0.05, "warmup_steps": 0, "check_every": 1,
+           "min_dwell_checks": 0, "flat_frac": 0.5, "lr_gate_frac": 0.3,
+           "sharp_ema_beta": 0.0, "switch_until_frac": 0.95}
+    cfg.update(over)
+    ctrl = build_controller(cfg)
     ctrl.setup(nn.Linear(8, 4), steps_per_epoch=10, total_epochs=10)  # 100 steps
-    ctrl._opt.last_sharpness = 0.0            # edge_ratio = 0 < restart_ratio
-    before = len(ctrl.switch_events)
-    ctrl.begin_step(10)                       # in-window, check fires
-    assert len(ctrl.switch_events) == before + 1
-    assert isinstance(ctrl.switch_events[-1], SwitchEvent)
+    return ctrl
+
+
+def _run(ctrl, n, sharp_fn):
+    lrs = []
+    for step in range(n):
+        ctrl._opt.last_sharpness = sharp_fn(step)   # the loop fills this each step
+        ctrl.begin_step(step)
+        lrs.append(ctrl.active_lr)
+    return lrs
+
+
+def test_constant_sharpness_no_lr_pinning_and_cap_restarts():
+    # The OLD-bug regression: with sharpness that never flattens, lr must still
+    # cosine-decay (NOT pin at peak) and restarts must come from the cap, not
+    # every check.
+    ctrl = _robust_ctrl(cycle_epochs=2.0)        # cycle_steps = 20
+    lrs = _run(ctrl, 60, lambda s: 5.0)          # constant -> never flattens
+    assert min(lrs[5:20]) < 0.5 * ctrl.peak_lr   # lr annealed within the first cycle
+    assert 1 <= len(ctrl.switch_events) <= 5     # ~cap-period restarts, not every step
+    assert all("cap" in e.reason for e in ctrl.switch_events)
+
+
+def test_relative_flatten_triggers_adaptive_restart():
+    # High baseline then a drop, once lr has annealed -> an adaptive (flatten)
+    # restart fires before the cap.
+    ctrl = _robust_ctrl(cycle_epochs=3.0)        # cap = 30 steps
+    lrs = _run(ctrl, 29, lambda s: 10.0 if s < 5 else 1.0)
+    assert any("flatten" in e.reason for e in ctrl.switch_events)
+
+
+def test_lr_gate_blocks_restart_while_lr_high():
+    # Flattened immediately, but the lr-gate must block the restart while lr is
+    # still high (slow cosine, cap far away).
+    ctrl = _robust_ctrl(cycle_epochs=10.0)       # cap = 100, slow anneal
+    _run(ctrl, 8, lambda s: 10.0 if s == 0 else 1.0)
+    assert len(ctrl.switch_events) == 0
 
 
 def test_no_probe_overhead():

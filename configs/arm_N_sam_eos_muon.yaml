@@ -41,10 +41,13 @@ controller:
   sam_freeze_bn: false
   warmup_steps: 200
   check_every: 50            # cadence of the (free) restart check
-  restart_ratio: 0.1         # catapult when edge_ratio drops below this (settled)
-  cycle_epochs: 20.0         # cosine length within a cycle
+  cycle_epochs: 20.0         # cosine length within a cycle + max-period cap
   min_dwell_checks: 2        # min checks between restarts
   switch_until_frac: 0.8     # stop restarting in the last 20% -> final cosine settles
+  # robust relative trigger (scale-free; replaces the miscalibrated edge_ratio<restart_ratio):
+  flat_frac: 0.5            # restart when sharp_ema < flat_frac * sharp_at_cycle_start
+  lr_gate_frac: 0.3         # ...AND lr has annealed to <= this*peak (kills lr-pinning)
+  sharp_ema_beta: 0.6       # smooth the bf16 finite-difference sharpness
 
 probes:
   enabled: false
