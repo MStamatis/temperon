@@ -57,6 +57,9 @@ class SamCatapultController(CyclicCatapultController):
         #   False -> standard SAM (BN updates on both passes; official default)
         #   True  -> freeze BN stats on the perturbed pass (no pollution)
         self.sam_freeze_bn = bool(self.cfg.get("sam_freeze_bn", False))
+        # Periodic SAM (speed hack): run the full two-pass only every sam_period
+        # steps; other steps take a plain single-pass base update. 1 = every step.
+        self.sam_period = max(1, int(self.cfg.get("sam_period", 1)))
         super()._build()
 
         # --- stage 2: EoS-coupled rho ----------------------------------------

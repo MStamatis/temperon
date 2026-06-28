@@ -49,6 +49,9 @@ def build_optimizer(
     betas: tuple[float, float] = (0.9, 0.999),
     weight_decay: float = 0.0,
     nesterov: bool = False,
+    ns_steps: int = 5,
+    ns_dtype: str = "fp32",
+    muon_min_numel: int = 0,
 ) -> torch.optim.Optimizer:
     name = name.lower()
     if name == "sgd":
@@ -70,7 +73,10 @@ def build_optimizer(
     if name == "muon":
         from eos_switch.optimizers.muon import Muon  # Phase 4
 
-        return Muon(params, lr=lr, momentum=momentum, weight_decay=weight_decay)
+        return Muon(
+            params, lr=lr, momentum=momentum, weight_decay=weight_decay,
+            ns_steps=ns_steps, ns_dtype=ns_dtype, min_numel=muon_min_numel,
+        )
     raise ValueError(f"unknown optimizer {name!r}")
 
 

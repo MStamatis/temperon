@@ -142,7 +142,18 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
                 logits = train_model(x)
                 loss = loss_fn(logits, y)
             loss.backward()
-            if getattr(controller, "sam", False):
+            sam_on = getattr(controller, "sam", False)
+            if sam_on:
+                # Periodic SAM (speed hack): only do the full two-pass every
+                # sam_period steps; other steps take a plain single-pass base
+                # update with the clean gradient.
+                period = getattr(controller, "sam_period", 1)
+                sam_on = (period <= 1) or (global_step % period == 0)
+            if not sam_on and getattr(controller, "sam", False):
+                if grad_clip > 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                opt.base_optimizer.step()
+            elif sam_on:
                 # SAM (arm L): perturb to the local worst case, recompute the
                 # gradient there, then step from the original weights with that
                 # perturbed-point gradient. grad_clip applies to the UPDATE

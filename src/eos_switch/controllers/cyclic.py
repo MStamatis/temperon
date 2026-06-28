@@ -98,6 +98,11 @@ class CyclicCatapultController(Controller):
             betas=tuple(s.get("betas", (0.9, 0.999))),
             weight_decay=float(s.get("weight_decay", 0.0)),
             nesterov=bool(s.get("nesterov", False)),
+            # Muon speed knobs (ignored by other optimizers): NS precision, NS
+            # iteration count, and a min-size below which 2D params skip NS.
+            ns_steps=int(self.cfg.get("ns_steps", 5)),
+            ns_dtype=str(self.cfg.get("ns_dtype", "fp32")),
+            muon_min_numel=int(self.cfg.get("muon_min_numel", 0)),
         )
 
     def _position(self, step: int):
