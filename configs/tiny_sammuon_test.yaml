@@ -1,0 +1,45 @@
+# SAM+Muon on Tiny ImageNet -- TEST config: validation_split 0 trains on the full
+# 100k train set and evaluates on the official 10k Tiny ImageNet test/val set
+# (the standard Tiny ImageNet eval protocol). Identical to tiny_sammuon_val.yaml
+# except the eval set. Reports the final + per-epoch test accuracy.
+run_name: tiny_sammuon_test
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+
+model: resnet110
+initial_channels: 64
+bn_momentum: 0.01
+stem_stride: 2
+
+dataset:
+  name: tinyimagenet
+  validation_split: 0          # train on full 100k, eval on the 10k TEST set
+
+augment:
+  enabled: true
+  cutout: 16
+  color_jitter: 0.1
+
+controller:
+  type: sam_catapult
+  base_optimizer: muon
+  lr: 0.01
+  min_lr: 0.0
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 0.2
+  n_cycles: 4
+  t_mult: 2.0
+  warmup_steps: 200
+  rho: 0.05
+  sam_freeze_bn: false
+  eos_rho: false
+  ns_dtype: bf16
+
+probes:
+  enabled: false

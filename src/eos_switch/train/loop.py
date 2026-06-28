@@ -73,6 +73,7 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
         data.num_classes,
         initial_channels=cfg.get("initial_channels"),
         bn_momentum=float(cfg.get("bn_momentum", 0.1)),
+        stem_stride=int(cfg.get("stem_stride", 1)),
     ).to(device)
     if is_cuda:
         model = model.to(memory_format=torch.channels_last)

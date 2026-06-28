@@ -21,9 +21,10 @@ import torchvision
 _STATS = {
     "cifar10": ((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
     "cifar100": ((0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2762)),
+    "tinyimagenet": ((0.4802, 0.4481, 0.3975), (0.2770, 0.2691, 0.2821)),
 }
 
-_NUM_CLASSES = {"cifar10": 10, "cifar100": 100}
+_NUM_CLASSES = {"cifar10": 10, "cifar100": 100, "tinyimagenet": 200}
 
 
 def _random_crop(x: torch.Tensor, pad: int, gen: torch.Generator) -> torch.Tensor:
@@ -102,14 +103,18 @@ class GPUCifar:
         self.color_jitter = float(color_jitter)
         root = root or os.environ.get("EOS_DATA_DIR", "./data")
 
-        cls = torchvision.datasets.CIFAR10 if name == "cifar10" else torchvision.datasets.CIFAR100
-        train_ds = cls(root, train=True, download=True)
-        test_ds = cls(root, train=False, download=True)
+        if name == "tinyimagenet":
+            from eos_switch.data.tiny_imagenet import load_tiny_imagenet
 
-        x_train = torch.from_numpy(train_ds.data).permute(0, 3, 1, 2).contiguous()
-        y_train = torch.tensor(train_ds.targets, dtype=torch.long)
-        x_test = torch.from_numpy(test_ds.data).permute(0, 3, 1, 2).contiguous()
-        y_test = torch.tensor(test_ds.targets, dtype=torch.long)
+            x_train, y_train, x_test, y_test = load_tiny_imagenet(root)
+        else:
+            cls = torchvision.datasets.CIFAR10 if name == "cifar10" else torchvision.datasets.CIFAR100
+            train_ds = cls(root, train=True, download=True)
+            test_ds = cls(root, train=False, download=True)
+            x_train = torch.from_numpy(train_ds.data).permute(0, 3, 1, 2).contiguous()
+            y_train = torch.tensor(train_ds.targets, dtype=torch.long)
+            x_test = torch.from_numpy(test_ds.data).permute(0, 3, 1, 2).contiguous()
+            y_test = torch.tensor(test_ds.targets, dtype=torch.long)
 
         if smoke_subset is not None:
             # Fixed permutation (seed 0) so every smoke run sees the same subset.
@@ -129,6 +134,9 @@ class GPUCifar:
 
         self.x_train = x_train.to(self.device)
         self.y_train = y_train.to(self.device)
+        # Random-crop padding scales with the image size (4 px for 32x32 CIFAR,
+        # 8 px for 64x64 Tiny ImageNet).
+        self.crop_pad = self.x_train.shape[-1] // 8
         self.x_test = x_test.to(self.device)
         self.y_test = y_test.to(self.device)
         if x_val is not None:
@@ -169,7 +177,7 @@ class GPUCifar:
             x = self.x_train[idx]
             y = self.y_train[idx]
             if augment:
-                x = _random_crop(x, pad=4, gen=generator)
+                x = _random_crop(x, pad=self.crop_pad, gen=generator)
                 x = _random_flip(x, gen=generator)
             x01 = x.float().div_(255.0)
             if augment and self.color_jitter > 0:

@@ -45,9 +45,11 @@ class CifarResNet(nn.Module):
     """Generic CIFAR ResNet over a list of (width, num_blocks, stride) stages."""
 
     def __init__(self, stages: list[tuple[int, int, int]], stem_width: int, num_classes: int,
-                 bn_momentum: float = 0.1) -> None:
+                 bn_momentum: float = 0.1, stem_stride: int = 1) -> None:
         super().__init__()
-        self.conv1 = _conv3x3(3, stem_width)
+        # stem_stride=2 downsamples the input once (e.g. 64x64 Tiny ImageNet ->
+        # 32x32) so the rest of the CIFAR ResNet runs at its native resolution.
+        self.conv1 = _conv3x3(3, stem_width, stride=stem_stride)
         self.bn1 = nn.BatchNorm2d(stem_width, momentum=bn_momentum)
         layers: list[nn.Module] = []
         in_planes = stem_width
@@ -95,13 +97,15 @@ def build_model(
     num_classes: int,
     initial_channels: int | None = None,
     bn_momentum: float = 0.1,
+    stem_stride: int = 1,
 ) -> nn.Module:
     name = name.lower()
     if name == "smallcnn":
         return SmallCNN(num_classes)
     if name == "resnet18":
         stages = [(64, 2, 1), (128, 2, 2), (256, 2, 2), (512, 2, 2)]
-        return CifarResNet(stages, stem_width=64, num_classes=num_classes, bn_momentum=bn_momentum)
+        return CifarResNet(stages, stem_width=64, num_classes=num_classes,
+                           bn_momentum=bn_momentum, stem_stride=stem_stride)
     if name.startswith("resnet"):
         depth = int(name.removeprefix("resnet"))
         if (depth - 2) % 6 != 0:
@@ -111,5 +115,6 @@ def build_model(
         # The OptiRoulette framework uses initial_channels=64 (a much wider net).
         c = initial_channels or 16
         stages = [(c, n, 1), (2 * c, n, 2), (4 * c, n, 2)]
-        return CifarResNet(stages, stem_width=c, num_classes=num_classes, bn_momentum=bn_momentum)
+        return CifarResNet(stages, stem_width=c, num_classes=num_classes,
+                           bn_momentum=bn_momentum, stem_stride=stem_stride)
     raise ValueError(f"unknown model {name!r}")
