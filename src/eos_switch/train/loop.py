@@ -102,6 +102,7 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
     aug_cfg = cfg.get("augment", {})
     augment = bool(aug_cfg.get("enabled", True))
     cutout = int(aug_cfg.get("cutout", 0))
+    flip = bool(aug_cfg.get("flip", True))  # off for label-changing flips (SVHN)
     grad_clip = float(cfg.get("grad_clip", 0.0))
 
     probe_sched = None
@@ -128,7 +129,7 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
         ep_start = time.perf_counter()
         ep_loss_sum = 0.0
         ep_steps = 0
-        for x, y in data.train_batches(batch_size, gen, augment=augment, cutout=cutout):
+        for x, y in data.train_batches(batch_size, gen, augment=augment, cutout=cutout, flip=flip):
             if is_cuda:
                 x = x.contiguous(memory_format=torch.channels_last)
             opt = controller.begin_step(global_step)

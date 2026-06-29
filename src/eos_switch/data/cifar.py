@@ -22,9 +22,10 @@ _STATS = {
     "cifar10": ((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
     "cifar100": ((0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2762)),
     "tinyimagenet": ((0.4802, 0.4481, 0.3975), (0.2770, 0.2691, 0.2821)),
+    "svhn": ((0.4377, 0.4438, 0.4728), (0.1980, 0.2010, 0.1970)),
 }
 
-_NUM_CLASSES = {"cifar10": 10, "cifar100": 100, "tinyimagenet": 200}
+_NUM_CLASSES = {"cifar10": 10, "cifar100": 100, "tinyimagenet": 200, "svhn": 10}
 
 
 def _random_crop(x: torch.Tensor, pad: int, gen: torch.Generator) -> torch.Tensor:
@@ -107,6 +108,15 @@ class GPUCifar:
             from eos_switch.data.tiny_imagenet import load_tiny_imagenet
 
             x_train, y_train, x_test, y_test = load_tiny_imagenet(root)
+        elif name == "svhn":
+            # torchvision SVHN: split= API, .data is already (N,3,32,32), labels
+            # in .labels (0-9, the original '10'->'0' remap is done by torchvision).
+            tr = torchvision.datasets.SVHN(root, split="train", download=True)
+            te = torchvision.datasets.SVHN(root, split="test", download=True)
+            x_train = torch.from_numpy(tr.data).contiguous()
+            y_train = torch.tensor(tr.labels, dtype=torch.long)
+            x_test = torch.from_numpy(te.data).contiguous()
+            y_test = torch.tensor(te.labels, dtype=torch.long)
         else:
             cls = torchvision.datasets.CIFAR10 if name == "cifar10" else torchvision.datasets.CIFAR100
             train_ds = cls(root, train=True, download=True)
@@ -166,9 +176,14 @@ class GPUCifar:
         generator: torch.Generator,
         augment: bool = True,
         cutout: int = 0,
+        flip: bool = True,
         drop_last: bool = True,
     ):
-        """Yield one epoch of shuffled, augmented (x, y) batches."""
+        """Yield one epoch of shuffled, augmented (x, y) batches.
+
+        ``flip`` controls horizontal flipping -- set False for datasets where it
+        is label-changing (e.g. SVHN digits).
+        """
         n = len(self.x_train)
         perm = torch.randperm(n, device=self.device, generator=generator)
         end = (n // batch_size) * batch_size if drop_last else n
@@ -178,7 +193,8 @@ class GPUCifar:
             y = self.y_train[idx]
             if augment:
                 x = _random_crop(x, pad=self.crop_pad, gen=generator)
-                x = _random_flip(x, gen=generator)
+                if flip:
+                    x = _random_flip(x, gen=generator)
             x01 = x.float().div_(255.0)
             if augment and self.color_jitter > 0:
                 cj = self.color_jitter
