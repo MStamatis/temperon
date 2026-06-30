@@ -49,6 +49,47 @@ def evaluate(model, data: GPUCifar, autocast_enabled: bool, device: torch.device
     return correct / n, loss_sum / n
 
 
+@torch.no_grad()
+def final_metrics(model, data: GPUCifar, autocast_enabled: bool, device: torch.device) -> dict:
+    """Full classification metric suite on the eval set (accuracy, macro/weighted
+    precision/recall/F1, macro one-vs-rest ROC-AUC). sklearn is optional -- without
+    it only accuracy is reported."""
+    model.eval()
+    logits_all, y_all = [], []
+    for x, y in data.eval_batches():
+        if device.type == "cuda":
+            x = x.contiguous(memory_format=torch.channels_last)
+        with torch.autocast(device.type, dtype=torch.bfloat16, enabled=autocast_enabled):
+            logits = model(x)
+        logits_all.append(logits.float().cpu())
+        y_all.append(y.cpu())
+    model.train()
+    logits = torch.cat(logits_all)
+    y_true = torch.cat(y_all).numpy()
+    probs = torch.softmax(logits, dim=1).numpy()
+    pred = logits.argmax(1).numpy()
+    out = {
+        "accuracy": float((pred == y_true).mean()),
+        "n_eval": int(len(y_true)),
+        "n_classes": int(logits.shape[1]),
+    }
+    try:
+        from sklearn.metrics import precision_recall_fscore_support, roc_auc_score
+
+        for avg in ("macro", "weighted"):
+            p, r, f, _ = precision_recall_fscore_support(y_true, pred, average=avg, zero_division=0)
+            out[f"precision_{avg}"], out[f"recall_{avg}"], out[f"f1_{avg}"] = float(p), float(r), float(f)
+        try:
+            out["roc_auc_macro_ovr"] = float(
+                roc_auc_score(y_true, probs, multi_class="ovr", average="macro")
+            )
+        except Exception:
+            out["roc_auc_macro_ovr"] = None  # e.g. a class absent from the eval set
+    except ImportError:
+        out["sklearn"] = "missing (pip install scikit-learn for full metrics)"
+    return out
+
+
 def run_training(cfg: dict, out_dir: str | Path) -> dict:
     device = resolve_device(cfg.get("device"))
     is_cuda = device.type == "cuda"
@@ -227,6 +268,7 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
         )
 
     total_s = time.perf_counter() - t0
+    metrics = final_metrics(model, data, autocast_enabled, device)
     summary = {
         "run_name": cfg.get("run_name", "run"),
         "seed": seed,
@@ -237,6 +279,14 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
         "epochs": epochs,
         "final_val_acc": round(val_acc, 4),
         "best_val_acc": round(best_val_acc, 4),
+        # full metric suite on the eval set (final model)
+        "test_accuracy": round(metrics["accuracy"], 4),
+        "f1_macro": round(metrics.get("f1_macro", float("nan")), 4),
+        "precision_macro": round(metrics.get("precision_macro", float("nan")), 4),
+        "recall_macro": round(metrics.get("recall_macro", float("nan")), 4),
+        "f1_weighted": round(metrics.get("f1_weighted", float("nan")), 4),
+        "roc_auc_macro_ovr": (round(metrics["roc_auc_macro_ovr"], 4)
+                              if metrics.get("roc_auc_macro_ovr") is not None else None),
         "total_time_s": round(total_s, 2),
         "n_switches": len(controller.switch_events),
         "probe_overhead_frac": round(_probe_overhead(probe_sched, controller, total_s), 4),
@@ -264,6 +314,8 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
             with open(Path(out_dir) / fname, "w", encoding="utf-8") as fh:
                 for r in records:
                     fh.write(json.dumps(r) + "\n")
+    with open(Path(out_dir) / "metrics.json", "w", encoding="utf-8") as fh:
+        json.dump(metrics, fh, indent=2)
     return summary
 
 
