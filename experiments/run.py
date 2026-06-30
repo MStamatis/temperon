@@ -61,6 +61,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--device", default=None, help="cpu / cuda / auto (default: config or auto)")
     parser.add_argument("--compile", action="store_true", help="torch.compile the training forward")
+    parser.add_argument("--continue", dest="cont", action="store_true",
+                        help="resume from <out>/checkpoint.pt if present; skip if already complete")
     parser.add_argument("--output", default="results")
     parser.add_argument(
         "--set",
@@ -88,6 +90,8 @@ def main() -> None:
         cfg["device"] = args.device
     if args.compile:
         cfg["compile"] = True
+    if args.cont:
+        cfg["continue"] = True
 
     out_dir = Path(args.output) / cfg["run_name"] / f"seed{cfg['seed']}"
     print(f"run: {cfg['run_name']}  seed={cfg['seed']}  out={out_dir}", flush=True)

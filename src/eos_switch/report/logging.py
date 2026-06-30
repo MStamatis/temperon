@@ -29,6 +29,12 @@ class MilestoneTracker:
             out[f"hit_{t:.2f}_s"] = hit["wall_clock_s"] if hit else None
         return out
 
+    def state_dict(self) -> dict:
+        return {"hits": self.hits}
+
+    def load_state_dict(self, state: dict) -> None:
+        self.hits = {float(k): v for k, v in state.get("hits", {}).items()}
+
 
 class RunLogger:
     """Writes steps.jsonl / probes.jsonl / epochs.csv / summary.csv / meta.json."""

@@ -56,6 +56,15 @@ class Controller(ABC):
     def end_epoch(self, epoch: int, val_acc: float) -> None:  # noqa: B027
         pass
 
+    def state_dict(self) -> dict:
+        """Controller-internal counters for checkpoint/resume (default: none).
+        The LR schedule is a pure function of the step, so restoring global_step
+        suffices for schedule controllers; override to save extra counters."""
+        return {}
+
+    def load_state_dict(self, state: dict) -> None:  # noqa: B027
+        pass
+
     @property
     @abstractmethod
     def active_name(self) -> str:

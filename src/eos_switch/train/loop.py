@@ -10,6 +10,7 @@ Precision policy (research-critical):
 
 from __future__ import annotations
 
+import os
 import time
 from contextlib import nullcontext
 from pathlib import Path
@@ -90,6 +91,44 @@ def final_metrics(model, data: GPUCifar, autocast_enabled: bool, device: torch.d
     return out
 
 
+def _real_opt(controller):
+    """The underlying torch optimizer to checkpoint (unwrap the SAM shell)."""
+    o = controller.active_optimizer
+    return getattr(o, "base_optimizer", o)
+
+
+def _save_checkpoint(path, *, next_epoch, global_step, best_val_acc, model, opt,
+                     controller, milestones, epoch_rows, gen, is_cuda) -> None:
+    """Atomically write the SINGLE resume checkpoint (tmp -> os.replace), so a
+    crash mid-write cannot corrupt it. Overwrites the previous one (no growth)."""
+    ckpt = {
+        "next_epoch": next_epoch, "global_step": global_step, "best_val_acc": best_val_acc,
+        "model": model.state_dict(), "optimizer": opt.state_dict(),
+        "controller": controller.state_dict(), "milestones": milestones.state_dict(),
+        "epoch_rows": epoch_rows,
+        "rng_torch": torch.get_rng_state(),
+        "rng_cuda": torch.cuda.get_rng_state_all() if is_cuda else None,
+        "rng_gen": gen.get_state(),
+    }
+    tmp = Path(str(path) + ".tmp")
+    torch.save(ckpt, tmp)
+    os.replace(tmp, path)
+
+
+def _load_checkpoint(path, *, model, opt, controller, milestones, logger, gen, is_cuda):
+    ckpt = torch.load(path, map_location="cpu", weights_only=False)
+    model.load_state_dict(ckpt["model"])
+    opt.load_state_dict(ckpt["optimizer"])
+    controller.load_state_dict(ckpt["controller"])
+    milestones.load_state_dict(ckpt["milestones"])
+    logger._epoch_rows = list(ckpt["epoch_rows"])
+    torch.set_rng_state(ckpt["rng_torch"])
+    if is_cuda and ckpt.get("rng_cuda") is not None:
+        torch.cuda.set_rng_state_all(ckpt["rng_cuda"])
+    gen.set_state(ckpt["rng_gen"])
+    return ckpt["next_epoch"], ckpt["global_step"], ckpt["best_val_acc"]
+
+
 def run_training(cfg: dict, out_dir: str | Path) -> dict:
     device = resolve_device(cfg.get("device"))
     is_cuda = device.type == "cuda"
@@ -166,7 +205,22 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
     val_acc = float("nan")
     best_val_acc = 0.0
 
-    for epoch in range(epochs):
+    # --- checkpoint / resume (--continue) ---
+    start_epoch = 0
+    ckpt_path = Path(out_dir) / "checkpoint.pt"
+    if bool(cfg.get("continue", False)):
+        if (Path(out_dir) / "summary.csv").exists():
+            import pandas as pd  # this run already finished -> skip it
+
+            print(f"[skip] {out_dir} already complete", flush=True)
+            return pd.read_csv(Path(out_dir) / "summary.csv").iloc[0].to_dict()
+        if ckpt_path.exists():
+            start_epoch, global_step, best_val_acc = _load_checkpoint(
+                ckpt_path, model=model, opt=_real_opt(controller), controller=controller,
+                milestones=milestones, logger=logger, gen=gen, is_cuda=is_cuda)
+            print(f"[resume] {out_dir} from epoch {start_epoch} (step {global_step})", flush=True)
+
+    for epoch in range(start_epoch, epochs):
         ep_start = time.perf_counter()
         ep_loss_sum = 0.0
         ep_steps = 0
@@ -266,6 +320,12 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
                 "wall_clock_s": round(wall, 2),
             }
         )
+        _save_checkpoint(
+            ckpt_path, next_epoch=epoch + 1, global_step=global_step,
+            best_val_acc=best_val_acc, model=model, opt=_real_opt(controller),
+            controller=controller, milestones=milestones,
+            epoch_rows=logger._epoch_rows, gen=gen, is_cuda=is_cuda,
+        )
 
     total_s = time.perf_counter() - t0
     metrics = final_metrics(model, data, autocast_enabled, device)
@@ -316,6 +376,8 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
                     fh.write(json.dumps(r) + "\n")
     with open(Path(out_dir) / "metrics.json", "w", encoding="utf-8") as fh:
         json.dump(metrics, fh, indent=2)
+    if ckpt_path.exists():
+        ckpt_path.unlink()  # run finished -> drop the resume checkpoint (saves space)
     return summary
 
 

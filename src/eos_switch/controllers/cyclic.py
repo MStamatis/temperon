@@ -164,3 +164,15 @@ class CyclicCatapultController(Controller):
     @property
     def active_optimizer(self) -> torch.optim.Optimizer:
         return self._opt
+
+    def state_dict(self) -> dict:
+        # Schedule lr is a pure function of step; only the restart/loss counters
+        # are stateful. (Single-base arms have no pool/bandit to restore.)
+        return {"last_cycle": self._last_cycle, "loss_ema": self._loss_ema,
+                "cycle_start_loss": self._cycle_start_loss, "name": self._name}
+
+    def load_state_dict(self, state: dict) -> None:
+        self._last_cycle = state.get("last_cycle", self._last_cycle)
+        self._loss_ema = state.get("loss_ema", self._loss_ema)
+        self._cycle_start_loss = state.get("cycle_start_loss", self._cycle_start_loss)
+        self._name = state.get("name", self._name)
