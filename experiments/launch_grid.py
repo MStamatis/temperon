@@ -64,6 +64,8 @@ def build_jobs(args) -> list[dict]:
                     cmd += ["--set", f"epochs={args.epochs}"]
                 if args.smoke:
                     cmd.append("--smoke")
+                if args.cont:
+                    cmd.append("--continue")
                 if args.extra:
                     cmd += shlex.split(args.extra)
                 jobs.append({"name": f"{name}_seed{seed}", "cmd": cmd})
@@ -79,6 +81,8 @@ def main() -> int:
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--epochs", type=int, default=None, help="override epochs for every run")
     parser.add_argument("--extra", default="", help="extra args appended to every run.py call")
+    parser.add_argument("--continue", dest="cont", action="store_true",
+                        help="pass --continue to every run (resume/skip-if-done)")
     parser.add_argument("--output", default="results")
     args = parser.parse_args()
 
