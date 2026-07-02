@@ -25,6 +25,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 METRICS = ["test_accuracy", "f1_macro", "precision_macro", "recall_macro",
            "roc_auc_macro_ovr", "best_val_acc"]
+MILESTONE_GRID = [0.50, 0.55, 0.60, 0.65, 0.66, 0.68, 0.70, 0.75, 0.78, 0.80,
+                  0.81, 0.82, 0.83, 0.84, 0.85, 0.90, 0.92, 0.93, 0.94, 0.95,
+                  0.96, 0.965, 0.97, 0.975, 0.98]
 ARM_ORDER = ["sammuon", "samsgd", "muon", "cyclicj", "strongsgd"]
 ARM_LABEL = {"sammuon": "SAM+Muon (ours)", "samsgd": "SAM+SGD [Foret'21]",
              "muon": "Muon [Jordan'24]", "cyclicj": "cyclic-J [SGDR'17]",
@@ -121,6 +124,57 @@ def plot_curves(runs: dict, path: str, ds: str) -> None:
     plt.close(fig)
 
 
+def _first_hit(curve, t):
+    for e, a in curve:
+        if a >= t:
+            return e
+    return None
+
+
+def milestones(runs: dict):
+    """First-hit epoch per arm x target (mean over seeds), for targets up to the
+    best final accuracy reached. None = an arm never reaches that target."""
+    finals = [r["_curve"][-1][1] for recs in runs.values() for r in recs if r.get("_curve")]
+    best = max(finals) if finals else 1.0
+    targets = [t for t in MILESTONE_GRID if t <= best + 1e-9]
+    order = [a for a in ARM_ORDER if a in runs] + [a for a in runs if a not in ARM_ORDER]
+    rows = []
+    for arm in order:
+        curves = [r["_curve"] for r in runs[arm] if r.get("_curve")]
+        row = {"arm": arm, "label": ARM_LABEL.get(arm, arm)}
+        for t in targets:
+            hits = [h for h in (_first_hit(c, t) for c in curves) if h is not None]
+            row[f"e@{t:.2f}"] = round(st.mean(hits), 1) if hits and len(hits) == len(curves) else None
+        rows.append(row)
+    return targets, rows
+
+
+def write_milestones_csv(targets, rows, path):
+    cols = ["arm", "label"] + [f"e@{t:.2f}" for t in targets]
+    with open(path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
+        w.writeheader()
+        for r in rows:
+            w.writerow(r)
+
+
+def plot_milestones(targets, rows, path, ds):
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    for r in rows:
+        xs = [t for t in targets if r.get(f"e@{t:.2f}") is not None]
+        ys = [r[f"e@{t:.2f}"] for t in xs]
+        if xs:
+            ax.plot(xs, ys, marker="o", markersize=4, linewidth=1.6, label=r["label"])
+    ax.set_xlabel("target accuracy")
+    ax.set_ylabel("epochs to first reach (mean)")
+    ax.set_title(f"{ds}: sample-efficiency (epochs to accuracy target; lower = faster)")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(path, dpi=140)
+    plt.close(fig)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("results_dir")
@@ -133,8 +187,11 @@ def main() -> None:
     write_csv(rows, os.path.join(args.results_dir, "comparison.csv"))
     plot_bars(rows, os.path.join(args.results_dir, f"{ds}_accuracy_f1.png"), ds)
     plot_curves(runs, os.path.join(args.results_dir, f"{ds}_curves.png"), ds)
+    m_targets, m_rows = milestones(runs)
+    write_milestones_csv(m_targets, m_rows, os.path.join(args.results_dir, "milestones.csv"))
+    plot_milestones(m_targets, m_rows, os.path.join(args.results_dir, f"{ds}_milestones.png"), ds)
     print(f"[{ds}] {len(runs)} arms, {sum(len(v) for v in runs.values())} runs")
-    print(f"  -> comparison.csv, {ds}_accuracy_f1.png, {ds}_curves.png")
+    print(f"  -> comparison.csv, milestones.csv, {ds}_accuracy_f1.png, {ds}_curves.png, {ds}_milestones.png")
     for r in rows:
         print(f"  {r['label']:<22} acc={r.get('test_accuracy_mean','?')}"
               f"+/-{r.get('test_accuracy_std','?')}  f1={r.get('f1_macro_mean','?')}"
