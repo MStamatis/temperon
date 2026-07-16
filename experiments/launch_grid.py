@@ -83,10 +83,18 @@ def main() -> int:
     parser.add_argument("--extra", default="", help="extra args appended to every run.py call")
     parser.add_argument("--continue", dest="cont", action="store_true",
                         help="pass --continue to every run (resume/skip-if-done)")
+    parser.add_argument("--dry-run", dest="dry_run", action="store_true",
+                        help="print the jobs that would run, then exit without launching")
     parser.add_argument("--output", default="results")
     args = parser.parse_args()
 
     jobs = build_jobs(args)
+    if args.dry_run:
+        print(f"{len(jobs)} jobs (dry run, nothing launched):")
+        for job in jobs:
+            print(f"  {job['name']}\n    {' '.join(job['cmd'])}")
+        return 0
+
     log_dir = Path(args.output) / "grid_logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     print(f"{len(jobs)} jobs, parallel={args.parallel}")
