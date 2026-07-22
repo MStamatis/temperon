@@ -1,0 +1,45 @@
+# GPU smoke for arm O (Tail-SAM): 4 epochs on a CIFAR-100 subset, SAM switches
+# on at 50% so the gate + rho ramp + single->two-pass transition all fire
+# inside the smoke. Expect: optimizer column flips muon -> sam:muon at ep2, one
+# sam_on switch event, no NaN.
+run_name: smoke_tailsam
+seed: 42
+device: auto
+deterministic: false
+epochs: 4
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+model: resnet110
+initial_channels: 64
+bn_momentum: 0.01
+stem_stride: 1
+dataset:
+  name: cifar100
+  smoke_subset: 5000
+  validation_split: 0
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+  flip: true
+controller:
+  type: sam_catapult
+  base_optimizer: muon
+  lr: 0.01
+  weight_decay: 0.2
+  rho: 0.05
+  n_cycles: 2
+  t_mult: 2.0
+  warmup_steps: 20
+  ns_dtype: bf16
+  sam_freeze_bn: false
+  eos_rho: false
+  min_lr: 0.0
+  momentum: 0.9
+  nesterov: true
+  sam_start_frac: 0.5
+  sam_rho_ramp_steps: 20
+  msam_rho: 0.05        # exercise the MSAM cheap-phase hooks too
+probes:
+  enabled: false

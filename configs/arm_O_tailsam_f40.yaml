@@ -1,0 +1,45 @@
+# Arm O (Phase 6, P1 pilot): Tail-SAM Muon-catapult, f = 0.40.
+# Identical to bench/c100_sammuon except SAM runs ONLY in the last 40% of
+# training (sam_start_frac 0.60, inside the final t_mult=2 cycle's anneal)
+# with a 400-step rho ramp to soften the escape shock. Cheap phase = plain
+# Muon-catapult single-pass (~35.9 s/ep vs ~66 s/ep, bench seed42 medians).
+# GO if final test acc >= 0.825 (full SAM+Muon bench = 0.8292 +- 0.0019).
+run_name: arm_O_tailsam_f40
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+model: resnet110
+initial_channels: 64
+bn_momentum: 0.01
+stem_stride: 1
+dataset:
+  name: cifar100
+  validation_split: 0
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+  flip: true
+controller:
+  type: sam_catapult
+  base_optimizer: muon
+  lr: 0.01
+  weight_decay: 0.2
+  rho: 0.05
+  n_cycles: 4
+  t_mult: 2.0
+  warmup_steps: 200
+  ns_dtype: bf16
+  sam_freeze_bn: false
+  eos_rho: false
+  min_lr: 0.0
+  momentum: 0.9
+  nesterov: true
+  sam_start_frac: 0.60
+  sam_rho_ramp_steps: 400
+probes:
+  enabled: false

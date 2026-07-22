@@ -43,6 +43,7 @@ import time
 
 import torch
 
+from eos_switch.controllers.base import SwitchEvent
 from eos_switch.controllers.cyclic import CyclicCatapultController
 from eos_switch.optimizers.sam import SAM
 
@@ -60,7 +61,30 @@ class SamCatapultController(CyclicCatapultController):
         # Periodic SAM (speed hack): run the full two-pass only every sam_period
         # steps; other steps take a plain single-pass base update. 1 = every step.
         self.sam_period = max(1, int(self.cfg.get("sam_period", 1)))
+        # --- Tail-SAM (arm O, Phase 6): pay the two-pass only in the tail -----
+        # sam_start_frac: fraction of total training steps before which SAM is
+        # OFF (plain single-pass base updates -- the cheap catapult phase).
+        # 0.0 = SAM from step 0 (arm L, unchanged default). Rationale: the 2x2
+        # attribution (SAM -> final basin only) + late-phase-SAM sufficiency
+        # (arXiv:2410.10373). Contiguous tail, NOT uniform thinning: the
+        # sam_period=2 speed_test lost -0.4pp, so allocation shape matters.
+        self.sam_start_frac = float(self.cfg.get("sam_start_frac", 0.0))
+        # sam_rho_ramp_steps: after SAM turns on, ramp rho linearly 0 -> rho
+        # over this many steps (soften the escape shock of a cold full-radius
+        # start; 2410.10373's escape phase). 0 = no ramp.
+        self.sam_rho_ramp_steps = int(self.cfg.get("sam_rho_ramp_steps", 0))
+        # MSAM (optional, zero extra pass): momentum-direction perturbation for
+        # the cheap (pre-SAM) phase. The loop takes the single gradient at
+        # w + msam_rho * m/||m|| (ascent along smoothed momentum, the SAM
+        # direction estimated for free -- Momentum-SAM, Becker et al.) and steps
+        # from the restored original weights. 0.0 = off.
+        self.msam_rho = float(self.cfg.get("msam_rho", 0.0))
         super()._build()
+        total_steps = self.total_epochs * max(self.steps_per_epoch, 1)
+        self._sam_start_step = int(round(self.sam_start_frac * total_steps))
+        self._sam_now = self._sam_start_step == 0
+        self._sam_on_recorded = self._sam_start_step == 0
+        self._msam_e: list[tuple[torch.Tensor, torch.Tensor]] = []
 
         # --- stage 2: EoS-coupled rho ----------------------------------------
         self.eos_rho = bool(self.cfg.get("eos_rho", False))
@@ -144,11 +168,77 @@ class SamCatapultController(CyclicCatapultController):
                 self._update_rho(step)
             # Apply to whatever optimizer is active (robust to pool rebuilds).
             opt.rho = self._cur_rho
+        # --- Tail-SAM bookkeeping + rho ramp ---------------------------------
+        was_on = self._sam_now
+        self._sam_now = self.sam_active(step)
+        if self._sam_now and not was_on and not self._sam_on_recorded:
+            self._sam_on_recorded = True
+            base = super().active_name
+            self._record_switch(SwitchEvent(
+                step=step, epoch=self.epoch_of(step), from_name=base,
+                to_name=f"sam:{base}", from_lr=self.active_lr,
+                to_lr=self.active_lr,
+                reason=f"sam_on|start_frac:{self.sam_start_frac}",
+            ))
+        if self._sam_now and self.sam_rho_ramp_steps > 0:
+            frac = min(1.0, (step - self._sam_start_step + 1)
+                       / self.sam_rho_ramp_steps)
+            opt.rho = (self._cur_rho if self.eos_rho else self.rho) * frac
         return opt
+
+    # --- Tail-SAM / MSAM loop gates (arm O) ----------------------------------
+    def sam_active(self, step: int) -> bool:
+        """Loop gate: run the two-pass only from the tail's start step on."""
+        return step >= self._sam_start_step
+
+    def msam_active(self, step: int) -> bool:
+        """Loop gate: momentum perturbation only in the cheap (pre-SAM) phase."""
+        return self.msam_rho > 0 and not self.sam_active(step)
+
+    @torch.no_grad()
+    def msam_perturb(self) -> None:
+        """Perturb w by +msam_rho * m/||m|| (ascent along smoothed momentum --
+        the free SAM-direction estimate). Called by the loop BEFORE the forward
+        pass; msam_restore() undoes it after the backward, so the base update
+        steps from the original weights with the perturbed-point gradient."""
+        base = getattr(self._opt, "base_optimizer", self._opt)
+        bufs = [(p, base.state[p].get("momentum_buffer"))
+                for group in base.param_groups for p in group["params"]
+                if p in base.state and base.state[p].get("momentum_buffer") is not None]
+        self._msam_e = []
+        if not bufs:
+            return  # no momentum yet (first steps): no perturbation
+        norm = torch.norm(torch.stack([b.norm(p=2) for _, b in bufs]), p=2)
+        if not torch.isfinite(norm) or norm <= 0:
+            return
+        scale = self.msam_rho / (norm + 1e-12)
+        for p, b in bufs:
+            e = b * scale
+            p.add_(e)
+            self._msam_e.append((p, e))
+
+    @torch.no_grad()
+    def msam_restore(self) -> None:
+        for p, e in self._msam_e:
+            p.sub_(e)
+        self._msam_e = []
+
+    def state_dict(self) -> dict:
+        d = super().state_dict()
+        d["sam_now"] = self._sam_now
+        d["sam_on_recorded"] = self._sam_on_recorded
+        return d
+
+    def load_state_dict(self, state: dict) -> None:
+        super().load_state_dict(state)
+        self._sam_now = bool(state.get("sam_now", self._sam_now))
+        self._sam_on_recorded = bool(
+            state.get("sam_on_recorded", self._sam_on_recorded))
 
     def overhead_frac(self, total_train_seconds: float) -> float:
         return self._probe_seconds / max(total_train_seconds, 1e-9)
 
     @property
     def active_name(self) -> str:
-        return f"sam:{super().active_name}"
+        base = super().active_name
+        return f"sam:{base}" if self._sam_now else base

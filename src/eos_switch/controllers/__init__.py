@@ -52,6 +52,10 @@ def build_controller(cfg: dict) -> Controller:
         from eos_switch.controllers.sam_eos_catapult import SamEosCatapultController  # arm N
 
         return SamEosCatapultController(cfg)
+    if kind == "handoff":
+        from eos_switch.controllers.handoff import HandoffController  # arm P (Phase 6)
+
+        return HandoffController(cfg)
     raise ValueError(f"unknown controller type {cfg['type']!r}")
 
 

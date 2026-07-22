@@ -115,11 +115,14 @@ def _save_checkpoint(path, *, next_epoch, global_step, best_val_acc, model, opt,
     os.replace(tmp, path)
 
 
-def _load_checkpoint(path, *, model, opt, controller, milestones, logger, gen, is_cuda):
+def _load_checkpoint(path, *, model, controller, milestones, logger, gen, is_cuda):
     ckpt = torch.load(path, map_location="cpu", weights_only=False)
     model.load_state_dict(ckpt["model"])
-    opt.load_state_dict(ckpt["optimizer"])
+    # Controller state FIRST: stage-switching controllers (handoff) must restore
+    # which stage is active so _real_opt resolves to the optimizer that the
+    # checkpoint's "optimizer" state actually belongs to.
     controller.load_state_dict(ckpt["controller"])
+    _real_opt(controller).load_state_dict(ckpt["optimizer"])
     milestones.load_state_dict(ckpt["milestones"])
     logger._epoch_rows = list(ckpt["epoch_rows"])
     torch.set_rng_state(ckpt["rng_torch"])
@@ -216,7 +219,7 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
             return pd.read_csv(Path(out_dir) / "summary.csv").iloc[0].to_dict()
         if ckpt_path.exists():
             start_epoch, global_step, best_val_acc = _load_checkpoint(
-                ckpt_path, model=model, opt=_real_opt(controller), controller=controller,
+                ckpt_path, model=model, controller=controller,
                 milestones=milestones, logger=logger, gen=gen, is_cuda=is_cuda)
             print(f"[resume] {out_dir} from epoch {start_epoch} (step {global_step})", flush=True)
 
@@ -234,12 +237,28 @@ def run_training(cfg: dict, out_dir: str | Path) -> dict:
                         probe_sched.notify_switch(ev)
                 n_switches_seen = len(controller.switch_events)
 
+            # MSAM (arm O cheap phase): take the single-pass gradient at the
+            # momentum-perturbed point (free SAM-direction estimate), then
+            # restore so the update steps from the original weights.
+            msam_gate = getattr(controller, "msam_active", None)
+            msam_now = msam_gate is not None and msam_gate(global_step)
+            if msam_now:
+                controller.msam_perturb()
             opt.zero_grad(set_to_none=True)
             with torch.autocast(device.type, dtype=torch.bfloat16, enabled=autocast_enabled):
                 logits = train_model(x)
                 loss = loss_fn(logits, y)
             loss.backward()
+            if msam_now:
+                controller.msam_restore()
             sam_on = getattr(controller, "sam", False)
+            if sam_on:
+                # Tail-SAM gate (arm O): the controller may keep SAM off for a
+                # cheap single-pass phase and switch the two-pass on only in
+                # the tail (sam_start_frac).
+                gate = getattr(controller, "sam_active", None)
+                if gate is not None:
+                    sam_on = bool(gate(global_step))
             if sam_on:
                 # Periodic SAM (speed hack): only do the full two-pass every
                 # sam_period steps; other steps take a plain single-pass base

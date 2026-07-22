@@ -1,0 +1,59 @@
+# GPU smoke for arm P (hand-off): 4 epochs on a CIFAR-100 subset, hand-off at
+# the ep-2 boundary so the SGD->SAM+Muon switch + momentum transfer + stage-2
+# warmup all fire inside the smoke. Expect: optimizer column flips
+# sgd_momentum -> sam:muon at ep2, one handoff switch event, no NaN, and a
+# checkpoint that resumes (checkpoint.pt is written each epoch).
+run_name: smoke_handoff
+seed: 42
+device: auto
+deterministic: false
+epochs: 4
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+model: resnet110
+initial_channels: 64
+bn_momentum: 0.01
+stem_stride: 1
+dataset:
+  name: cifar100
+  smoke_subset: 5000
+  validation_split: 0
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+  flip: true
+controller:
+  type: handoff
+  handoff_epoch: 2
+  handoff_transfer: momentum
+  stage1:
+    type: cyclic_catapult
+    base_optimizer: sgd_momentum
+    lr: 0.1
+    weight_decay: 0.0005
+    n_cycles: 2
+    t_mult: 1.0
+    warmup_steps: 20
+    min_lr: 0.0
+    momentum: 0.9
+    nesterov: true
+  stage2:
+    type: sam_catapult
+    base_optimizer: muon
+    lr: 0.01
+    weight_decay: 0.2
+    rho: 0.05
+    n_cycles: 1
+    t_mult: 1.0
+    warmup_steps: 20
+    ns_dtype: bf16
+    sam_freeze_bn: false
+    eos_rho: false
+    min_lr: 0.0
+    momentum: 0.9
+    nesterov: true
+    sam_rho_ramp_steps: 20
+probes:
+  enabled: false
