@@ -91,6 +91,16 @@ def test_state_roundtrip_preserves_sam_on():
 
 # --- MSAM (zero-extra-pass momentum perturbation, cheap phase only) ----------
 
+def test_start_frac_one_is_msam_full_mode():
+    # arm Q (MSAM literature baseline): SAM never fires, MSAM fires everywhere.
+    c = _controller(sam_start_frac=1.0, msam_rho=0.3)
+    assert not any(c.sam_active(s) for s in range(80))
+    assert all(c.msam_active(s) for s in range(80))
+    assert sum(_loop_sam_on(c, s) for s in range(80)) == 0
+    c.begin_step(0)
+    assert c.active_name == "muon" and c.switch_events == []
+
+
 def test_msam_gate_only_pre_sam():
     c = _controller(sam_start_frac=0.5, msam_rho=0.1)
     assert c.msam_active(10)
