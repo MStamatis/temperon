@@ -1,0 +1,59 @@
+# Arm P e80: the time-accuracy dial point -- same hand-off at ep43, 37-epoch tail.
+# Stage 1 = the bench c100_cyclicj recipe (cheapest s/epoch, 0.78@~ep43) for the
+# first 43 epochs; ONE scheduled momentum-only hand-off at the ep-43 boundary;
+# stage 2 = SAM+Muon on a single cosine anneal (the 2x2's best-final cell) with
+# a 200-step lr re-entry ramp and a 400-step rho ramp.
+# GO if 0.80 is hit before ~ep55 AND final test acc >= 0.82.
+run_name: arm_P_handoff_e80
+seed: 42
+device: auto
+deterministic: false
+epochs: 80
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+model: resnet110
+initial_channels: 64
+bn_momentum: 0.01
+stem_stride: 1
+dataset:
+  name: cifar100
+  validation_split: 0
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+  flip: true
+controller:
+  type: handoff
+  handoff_epoch: 43
+  handoff_transfer: momentum
+  stage1:                       # cyclic-J (bench c100_cyclicj), 4 cycles in 43 ep
+    type: cyclic_catapult
+    base_optimizer: sgd_momentum
+    lr: 0.1
+    weight_decay: 0.0005
+    n_cycles: 4
+    t_mult: 2.0
+    warmup_steps: 200
+    min_lr: 0.0
+    momentum: 0.9
+    nesterov: true
+  stage2:                       # SAM+Muon single-cosine tail (57 ep)
+    type: sam_catapult
+    base_optimizer: muon
+    lr: 0.01
+    weight_decay: 0.2
+    rho: 0.05
+    n_cycles: 1
+    t_mult: 1.0
+    warmup_steps: 200
+    ns_dtype: bf16
+    sam_freeze_bn: false
+    eos_rho: false
+    min_lr: 0.0
+    momentum: 0.9
+    nesterov: true
+    sam_rho_ramp_steps: 400
+probes:
+  enabled: false
