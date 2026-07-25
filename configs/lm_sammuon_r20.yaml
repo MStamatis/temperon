@@ -1,0 +1,33 @@
+# Phase 7 arm LM-B: full-time SAM+Muon (2x passes all run long) -- the ceiling
+# reference, LM analog of the vision bench sammuon. Identical to lm_muon.yaml
+# except sam_mode.
+run_name: lm_sammuon_r20
+seed: 42
+ctx: 1024
+device_bs: 32
+model:
+  n_layer: 12
+  n_head: 12
+  n_embd: 768
+data_dir: data/lm/wt103
+subset_tokens: 20000000
+total_tokens: 400000000
+warmup_steps: 250
+decay_frac: 0.3
+min_lr_frac: 0.0
+muon:
+  lr: 0.02
+  momentum: 0.95
+  weight_decay: 0.0
+  ns_dtype: bf16
+adamw:
+  lr: 0.0006
+  weight_decay: 0.1
+  betas: [0.9, 0.95]
+sam_mode: full
+rho: 0.05
+sam_start_frac: 0.7
+sam_rho_ramp_steps: 400
+grad_clip: 1.0
+eval_every: 250
+compile: true
