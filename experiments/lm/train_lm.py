@@ -241,7 +241,10 @@ def main() -> None:
 
     # --- bench mode: measure step time for THIS config's sam_mode, exit ------
     if args.bench > 0:
-        n_warm = 10
+        # 20 warmup steps: torch.compile/cudagraph settling must finish BEFORE
+        # the timed window (a 2-pass SAM warmup executes the graph 2x more, so
+        # a short warmup can bias the 1-pass arm slow, never the reverse).
+        n_warm = 20
         print(f"bench: model={raw_model.num_params()/1e6:.0f}M tok/step={tok_per_step} "
               f"sam_mode={sam_mode} compile={cfg.get('compile', True)}")
         if sam is not None:
@@ -256,9 +259,12 @@ def main() -> None:
                 torch.cuda.synchronize()
             if i >= n_warm:
                 times.append(time.perf_counter() - t0)
-        med = sorted(times)[len(times) // 2]
-        print(f"bench: {len(times)} steps  median {med*1000:.1f} ms  "
-              f"mean {sum(times)/len(times)*1000:.1f} ms  "
+        ts = sorted(times)
+        med = ts[len(ts) // 2]
+        p90 = ts[int(len(ts) * 0.9)]
+        print(f"bench: {len(ts)} steps  median {med*1000:.1f} ms  "
+              f"mean {sum(ts)/len(ts)*1000:.1f} ms  min {ts[0]*1000:.1f}  "
+              f"p90 {p90*1000:.1f}  max {ts[-1]*1000:.1f} ms  "
               f"{tok_per_step/med:,.0f} tok/s")
         print(f"bench: projected {total_steps} steps at this rate: "
               f"{total_steps*med/3600:.2f} h")
