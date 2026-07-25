@@ -12,6 +12,13 @@ dependencies = [
     "matplotlib",
     "pandas",
     "optiroulette>=0.1.0",
+    # Final-eval metrics (precision/recall/ROC-AUC in metrics.json). Was an
+    # ad-hoc container install before; pinned here so uv sync keeps it.
+    "scikit-learn",
+    # Phase 7 (LM) data prep: GPT-2 BPE + WikiText-103 parquet download.
+    "tiktoken",
+    "huggingface_hub",
+    "pyarrow",
 ]
 
 [dependency-groups]

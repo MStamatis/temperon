@@ -1,0 +1,33 @@
+# Phase 7 GPU smoke: tiny GPT, ~244 steps, SAM gate + decay both fire at step
+# ~146 (sam_start_frac 0.6 = 1 - decay_frac 0.4). Expect: sam_on flips 0->1 in
+# evals.csv, step_ms roughly doubles after the flip, no NaN, checkpoint resumes.
+run_name: lm_smoke
+seed: 42
+ctx: 256
+device_bs: 16
+model:
+  n_layer: 4
+  n_head: 4
+  n_embd: 256
+data_dir: data/lm/wt103
+subset_tokens: 2000000
+total_tokens: 1000000
+warmup_steps: 20
+decay_frac: 0.4
+min_lr_frac: 0.0
+muon:
+  lr: 0.02
+  momentum: 0.95
+  weight_decay: 0.0
+  ns_dtype: bf16
+adamw:
+  lr: 0.0006
+  weight_decay: 0.1
+  betas: [0.9, 0.95]
+sam_mode: tail
+rho: 0.05
+sam_start_frac: 0.6
+sam_rho_ramp_steps: 20
+grad_clip: 1.0
+eval_every: 60
+compile: false
