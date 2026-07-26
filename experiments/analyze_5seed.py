@@ -11,13 +11,19 @@ TARGETS = {
     "svhn": [0.95, 0.96, 0.97, 0.975, 0.98],
 }
 
-PHASE6 = {  # arm dir -> dataset
-    "arm_P_handoff": "c100",
-    "arm_P_handoff_e80": "c100",
-    "c100_sammuon_p2": "c100",
-    "arm_P_tiny": "tiny",
-    "arm_P_c10": "c10",
-    "arm_P_svhn": "svhn",
+ARMS = {  # display name -> (path under ROOT, dataset)
+    "arm_P_handoff":     ("phase6/arm_P_handoff", "c100"),
+    "arm_P_handoff_e80": ("phase6/arm_P_handoff_e80", "c100"),
+    "c100_sammuon_p2":   ("phase6/c100_sammuon_p2", "c100"),
+    "arm_P_tiny":        ("phase6/arm_P_tiny", "tiny"),
+    "arm_P_c10":         ("phase6/arm_P_c10", "c10"),
+    "arm_P_svhn":        ("phase6/arm_P_svhn", "svhn"),
+    # arm R: late-phase SAM (2410.10373) re-run in this pipeline. Absent dirs
+    # are skipped, so this stays correct while the sweep is still running.
+    "latesam_c100":      ("latesam/c100_latesam", "c100"),
+    "latesam_tiny":      ("latesam/tiny_latesam", "tiny"),
+    "latesam_c10":       ("latesam/c10_latesam", "c10"),
+    "latesam_svhn":      ("latesam/svhn_latesam", "svhn"),
 }
 BENCH_ARMS = ["sammuon", "samsgd", "cyclicj", "muon", "strongsgd"]
 
@@ -170,10 +176,12 @@ def summarize(name, runs, ds):
 all_stats = {}
 
 print("#" * 70)
-print("# PHASE 6 ARMS (5-seed)")
+print("# CONTROLLED ARMS (5-seed)")
 print("#" * 70)
-for arm, ds in PHASE6.items():
-    runs = collect(os.path.join(ROOT, "phase6", arm, "seed*"))
+for arm, (sub, ds) in ARMS.items():
+    runs = collect(os.path.join(ROOT, *sub.split("/"), "seed*"))
+    if not runs:
+        continue
     all_stats[arm] = summarize(arm, runs, ds) + (ds,)
 
 print()
@@ -201,6 +209,13 @@ pairs = [
     ("arm_P_tiny", "tiny_sammuon"),
     ("arm_P_c10", "c10_sammuon"),
     ("arm_P_svhn", "svhn_sammuon"),
+    # arm R: the published allocation rival, same pipeline and same HPs
+    ("arm_P_handoff", "latesam_c100"),
+    ("latesam_c100", "c100_sammuon"),
+    ("latesam_c100", "c100_samsgd"),
+    ("latesam_c100", "c100_strongsgd"),
+    ("arm_P_tiny", "latesam_tiny"),
+    ("latesam_tiny", "tiny_samsgd"),
 ]
 for a, b in pairs:
     if a not in all_stats or b not in all_stats:
@@ -214,7 +229,7 @@ print()
 print("#" * 70)
 print("# TIME-TO-TARGET (median first-hit wall-clock, phase6 arm vs baselines)")
 print("#" * 70)
-for arm, ds in PHASE6.items():
+for arm, (_sub, ds) in ARMS.items():
     if arm not in all_stats:
         continue
     targets = TARGETS[ds]
