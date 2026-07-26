@@ -146,6 +146,13 @@ PowerShell, `.\eos.ps1 <command>` is the identical counterpart.
 ./eos.sh python -m pytest tests/ -q
 ```
 
+On Windows PowerShell, the same two commands:
+
+```powershell
+.\eos.ps1 python experiments/run.py --config configs/arm_P_handoff.yaml
+.\eos.ps1 python -m pytest tests/ -q
+```
+
 Batch size is fixed at 128 in all comparative vision arms
 (Edge-of-Stochastic-Stability depends on it).
 

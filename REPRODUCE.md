@@ -20,6 +20,15 @@ docker compose exec dev uv sync --frozen
 ./eos.sh python -m pytest tests/ -q          # 147 tests, CPU-only
 ```
 
+On Windows PowerShell, replace `./eos.sh` with `.\eos.ps1` throughout — the
+two wrappers take identical arguments. Only the multi-run loop in section 3
+differs in syntax, and both forms are given there.
+
+```powershell
+.\eos.ps1 python experiments/check_env.py
+.\eos.ps1 python -m pytest tests/ -q
+```
+
 ## 1. Vision baselines (the 4x5 benchmark matrix)
 
 The per-dataset x per-arm configs are generated, not hand-written:
