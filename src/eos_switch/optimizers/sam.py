@@ -37,10 +37,17 @@ class SAM:
         self.last_sharpness: float | None = None
         self._gnorm = 0.0
         # Alias the base optimizer's groups/state: LR scheduling and zero_grad
-        # operate on the real parameters; e_w perturbations live alongside the
-        # base optimizer's own per-parameter state.
+        # operate on the real parameters.
         self.param_groups = base_optimizer.param_groups
         self.state = base_optimizer.state
+        # The perturbation is kept in SAM's OWN dict, never in the base
+        # optimizer's state. torch.optim.Adam/AdamW decide whether to lazily
+        # initialize exp_avg/exp_avg_sq with `if len(state) == 0`, so writing
+        # e_w there before the base optimizer's first step makes it skip its
+        # own initialization and blow up with KeyError: 'exp_avg' (SGD and Muon
+        # read their buffers with .get() and were unaffected, which is why this
+        # only ever surfaced with an Adam-family base).
+        self._e_w: dict[torch.Tensor, torch.Tensor] = {}
 
     def zero_grad(self, set_to_none: bool = True) -> None:
         self.base_optimizer.zero_grad(set_to_none=set_to_none)
@@ -71,7 +78,7 @@ class SAM:
                     continue
                 e_w = p.grad * scale.to(p)
                 p.add_(e_w)
-                self.state[p]["e_w"] = e_w
+                self._e_w[p] = e_w
         if zero_grad:
             self.zero_grad(set_to_none=True)
 
@@ -90,7 +97,7 @@ class SAM:
         dot = 0.0
         for group in self.param_groups:
             for p in group["params"]:
-                e_w = self.state[p].get("e_w") if p in self.state else None
+                e_w = self._e_w.get(p)
                 if e_w is not None and p.grad is not None:
                     dot += float(torch.sum(e_w * p.grad))
         rho = self.rho
@@ -101,10 +108,9 @@ class SAM:
         """Restore the original weights, then base-step with the perturbed grad."""
         for group in self.param_groups:
             for p in group["params"]:
-                e_w = self.state[p].get("e_w") if p in self.state else None
+                e_w = self._e_w.pop(p, None)
                 if e_w is not None:
                     p.sub_(e_w)
-                    self.state[p]["e_w"] = None
         self.base_optimizer.step()
         if zero_grad:
             self.zero_grad(set_to_none=True)
