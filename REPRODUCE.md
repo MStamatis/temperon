@@ -1,7 +1,9 @@
 # Reproducing the results
 
-Every command runs inside the container. On Windows use `./eos.ps1 <cmd>`; on
-Linux use `docker compose exec dev <cmd>`. All commands below assume the
+Every command runs inside the container, launched through the `./eos.sh <cmd>`
+wrapper (it starts the container if it is not already up). On Windows
+PowerShell use the identical `.\eos.ps1 <cmd>`; `docker compose exec dev <cmd>`
+also works anywhere if you prefer no wrapper. All commands below assume the
 repository root as the working directory.
 
 Canonical seeds: `42, 1181241943, 958682846, 271828, 314159`.
@@ -14,8 +16,8 @@ part of the claim, and concurrent runs inflate them by 20-30%.
 docker compose build dev
 docker compose up -d dev
 docker compose exec dev uv sync --frozen
-./eos.ps1 python experiments/check_env.py     # GPU sanity
-./eos.ps1 python -m pytest tests/ -q          # 141 tests, CPU-only
+./eos.sh python experiments/check_env.py     # GPU sanity
+./eos.sh python -m pytest tests/ -q          # 147 tests, CPU-only
 ```
 
 ## 1. Vision baselines (the 4x5 benchmark matrix)
@@ -23,14 +25,14 @@ docker compose exec dev uv sync --frozen
 The per-dataset x per-arm configs are generated, not hand-written:
 
 ```bash
-./eos.ps1 python experiments/gen_bench_configs.py
+./eos.sh python experiments/gen_bench_configs.py
 ```
 
 Then, per dataset (`c100`, `c10`, `tiny`, `svhn`) — this is the bulk of the
 GPU time, roughly 40 hours in total for all four:
 
 ```bash
-./eos.ps1 python experiments/launch_grid.py --configs "configs/bench/c100_*.yaml" --seeds "42,1181241943,958682846,271828,314159" --continue --output results/bench/c100
+./eos.sh python experiments/launch_grid.py --configs "configs/bench/c100_*.yaml" --seeds "42,1181241943,958682846,271828,314159" --continue --output results/bench/c100
 ```
 
 Outputs: `results/bench/<dataset>/<dataset>_<arm>/seed<seed>/`.
@@ -38,7 +40,7 @@ Outputs: `results/bench/<dataset>/<dataset>_<arm>/seed<seed>/`.
 ## 2. Phase 6 — the paper's arms
 
 ```bash
-./eos.ps1 python experiments/launch_grid.py --configs configs/arm_P_handoff.yaml configs/arm_P_handoff_e80.yaml configs/arm_P_tiny.yaml configs/arm_P_c10.yaml configs/arm_P_svhn.yaml configs/c100_sammuon_p2.yaml --seeds "42,1181241943,958682846,271828,314159" --continue --output results/phase6
+./eos.sh python experiments/launch_grid.py --configs configs/arm_P_handoff.yaml configs/arm_P_handoff_e80.yaml configs/arm_P_tiny.yaml configs/arm_P_c10.yaml configs/arm_P_svhn.yaml configs/c100_sammuon_p2.yaml --seeds "42,1181241943,958682846,271828,314159" --continue --output results/phase6
 ```
 
 | config | role in the paper |
@@ -53,7 +55,7 @@ Outputs: `results/bench/<dataset>/<dataset>_<arm>/seed<seed>/`.
 Statistics for every table in the README:
 
 ```bash
-./eos.ps1 python experiments/analyze_5seed.py results
+./eos.sh python experiments/analyze_5seed.py results
 ```
 
 This prints per-seed values, 5-seed mean±sd, median first-hit wall-clock per
@@ -65,20 +67,26 @@ target, and Welch two-sided tests. Saved output:
 One-time data preparation (CPU, ~5 min, writes `data/lm/wt103/`):
 
 ```bash
-./eos.ps1 python experiments/lm/prepare_data.py
+./eos.sh python experiments/lm/prepare_data.py
 ```
 
 Throughput check before committing GPU hours (the protocol used throughout —
 measure, then decide):
 
 ```bash
-./eos.ps1 python experiments/lm/train_lm.py --config configs/lm_muon.yaml --bench 40
+./eos.sh python experiments/lm/train_lm.py --config configs/lm_muon.yaml --bench 40
 ```
 
 The three arms (~3.4 h total: 0.86 + 1.06 + 1.48 h):
 
 ```bash
-foreach ($c in 'lm_muon','lm_handoff','lm_sammuon') { .\eos.ps1 python experiments/lm/train_lm.py --config "configs/$c.yaml" --continue }
+for c in lm_muon lm_handoff lm_sammuon; do ./eos.sh python experiments/lm/train_lm.py --config "configs/$c.yaml" --continue || break; done
+```
+
+PowerShell equivalent:
+
+```powershell
+foreach ($c in 'lm_muon','lm_handoff','lm_sammuon') { .\eos.ps1 python experiments/lm/train_lm.py --config "configs/$c.yaml" --continue; if (-not $?) { break } }
 ```
 
 The 20-pass boundary experiment (same budget, 20M-token slice) uses the
@@ -99,13 +107,13 @@ RoBERTa-base on the four small GLUE tasks, three arms, 5 seeds (~6.5-7 h; the
 launcher skips finished runs, so re-running the same command resumes):
 
 ```bash
-./eos.ps1 python experiments/glue/launch_glue.py
+./eos.sh python experiments/glue/launch_glue.py
 ```
 
 Single run:
 
 ```bash
-./eos.ps1 python experiments/glue/train_glue.py --task rte --arm tail --seed 42
+./eos.sh python experiments/glue/train_glue.py --task rte --arm tail --seed 42
 ```
 
 Outputs: `results/phase8/<task>/<arm>/seed<seed>/result.json`.

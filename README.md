@@ -123,14 +123,15 @@ docker compose exec dev python experiments/check_env.py
 If you see `no kernel image is available for execution on the device`, the
 installed torch wheels lack sm_120 support — rebuild against the cu128 index.
 
-On Windows, `./eos.ps1 <command>` forwards a command into the running
-container, which is how every run in this repo was launched.
+`./eos.sh <command>` forwards a command into the running container (starting
+it if needed), which is how every run in this repo was launched. On Windows
+PowerShell, `.\eos.ps1 <command>` is the identical counterpart.
 
 ## Running
 
 ```bash
-./eos.ps1 python experiments/run.py --config configs/arm_P_handoff.yaml
-./eos.ps1 python -m pytest tests/ -q
+./eos.sh python experiments/run.py --config configs/arm_P_handoff.yaml
+./eos.sh python -m pytest tests/ -q
 ```
 
 Batch size is fixed at 128 in all comparative vision arms
