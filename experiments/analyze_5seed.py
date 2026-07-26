@@ -216,6 +216,10 @@ pairs = [
     ("latesam_c100", "c100_strongsgd"),
     ("arm_P_tiny", "latesam_tiny"),
     ("latesam_tiny", "tiny_samsgd"),
+    # vs the published full-time SAM recipe on every dataset
+    ("arm_P_c10", "c10_samsgd"),
+    ("arm_P_svhn", "svhn_samsgd"),
+    ("arm_P_handoff", "c100_strongsgd"),
 ]
 for a, b in pairs:
     if a not in all_stats or b not in all_stats:
