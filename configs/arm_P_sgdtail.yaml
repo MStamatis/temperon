@@ -1,0 +1,71 @@
+# Arm S: arm P with an SGD refiner instead of Muon -- the missing 2x2 cell.
+#
+# arm P beats late-phase SAM by +0.61pp (0.8295 vs 0.8234, p=0.014), but it
+# differs from it in TWO ways at once: a Muon tail, AND a cyclic-J explorer
+# handing over to a fresh anneal rather than a standard cosine switched
+# mid-schedule. The accuracy gain is currently attributed to the refiner only
+# by indirection -- both SGD-refiner arms land at ~0.823 and both Muon-refiner
+# arms at ~0.829 -- which a reviewer will rightly want measured.
+#
+# This arm is arm_P_handoff with ONE thing changed: stage 2 runs SAM+SGD at the
+# SAM+SGD baseline's own tuned settings (lr 0.1, wd 5e-4, rho 0.2) instead of
+# SAM+Muon. Stage 1, the hand-off epoch, the transfer, the fresh single cosine
+# and both re-entry ramps are untouched.
+#
+#   vs arm_P_handoff -> isolates the refiner (Muon vs SGD), nothing else moves
+#   vs c100_latesam  -> isolates our allocation shape at a fixed refiner
+#
+# Predicted if the refiner is what buys the accuracy: this lands at ~0.823,
+# with late-phase SAM, and NOT at 0.829.
+run_name: arm_P_sgdtail
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+model: resnet110
+initial_channels: 64
+bn_momentum: 0.01
+stem_stride: 1
+dataset:
+  name: cifar100
+  validation_split: 0
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+  flip: true
+controller:
+  type: handoff
+  handoff_epoch: 43
+  handoff_transfer: momentum
+  stage1:                       # identical to arm_P_handoff
+    type: cyclic_catapult
+    base_optimizer: sgd_momentum
+    lr: 0.1
+    weight_decay: 0.0005
+    n_cycles: 4
+    t_mult: 2.0
+    warmup_steps: 200
+    min_lr: 0.0
+    momentum: 0.9
+    nesterov: true
+  stage2:                       # SAM+SGD tail: the ONLY change vs arm_P_handoff
+    type: sam_catapult
+    base_optimizer: sgd_momentum
+    lr: 0.1
+    weight_decay: 0.0005
+    rho: 0.2                    # the SAM+SGD baseline's tuned rho, not Muon's 0.05
+    n_cycles: 1
+    t_mult: 1.0
+    warmup_steps: 200
+    sam_freeze_bn: false
+    eos_rho: false
+    min_lr: 0.0
+    momentum: 0.9
+    nesterov: true
+    sam_rho_ramp_steps: 400
+probes:
+  enabled: false
