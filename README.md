@@ -29,12 +29,26 @@ Vision, 5 seeds per arm (`42, 1181241943, 958682846, 271828, 314159`),
 wide ResNet-110, 100 epochs. "Hand-off" = cyclic SGD explorer for 43 epochs,
 one scheduled switch, then a SAM+Muon tail owning a fresh cosine anneal.
 
-| dataset | hand-off | best full-SAM baseline | verdict | time to top target |
-|---|---|---|---|---|
-| CIFAR-100 | 0.8295 ± 0.0034 | SAM+Muon 0.8292 ± 0.0021 | tie (p=0.87) | 0.82 @ 4364s vs 6624s (**−34%**) |
-| Tiny ImageNet | 0.7003 ± 0.0033 | SAM+SGD 0.7027 ± 0.0032 | tie (p=0.29) | 0.69 @ 6602s vs 10935s (**−40%**) |
-| CIFAR-10 | 0.9695 ± 0.0008 | SAM+Muon 0.9694 ± 0.0008 | tie (p=0.94) | 0.968 @ 4418s vs 8052s |
-| SVHN | 0.9807 ± 0.0005 | SAM+Muon 0.9804 ± 0.0003 | tie (p=0.28) | **no time win** (boundary case) |
+Both full-time-SAM baselines are shown on every dataset: **SAM+SGD** is the
+published recipe ([Foret et al., 2021](https://arxiv.org/abs/2010.01412))
+re-run here, and **SAM+Muon** is this project's own stronger combination.
+Cells give final test accuracy (5-seed mean ± sd) and, below, the wall-clock
+median to the hardest target that any method reaches, with the fraction of
+seeds that reach it.
+
+| dataset (target) | Temperon | SAM+SGD *(published, re-run)* | SAM+Muon *(ours, full-time)* |
+|---|---|---|---|
+| **CIFAR-100** (0.82) | **0.8295 ± 0.0034**<br>4364s · 5/5 | 0.8232 ± 0.0031<br>5356s · 4/5 | 0.8292 ± 0.0021<br>6624s · 5/5 |
+| **Tiny ImageNet** (0.69) | 0.7003 ± 0.0033<br>**6602s** · 5/5 | **0.7027 ± 0.0032**<br>10935s · 5/5 | 0.6838 ± 0.0019<br>never |
+| **CIFAR-10** (0.968) | **0.9695 ± 0.0008**<br>**4418s** · 5/5 | 0.9668 ± 0.0005<br>4646s · 1/5 | 0.9694 ± 0.0008<br>8052s · 5/5 |
+| **SVHN** (0.98) | **0.9807 ± 0.0005**<br>8035s · 5/5 | 0.9798 ± 0.0004<br>6692s · 3/5 | 0.9804 ± 0.0003<br>**4820s** · 5/5 |
+
+Read that as: Temperon **ties the best full-time-SAM recipe on accuracy
+everywhere** (Welch p = 0.87 / 0.29 / 0.94 / 0.28) while reaching the hard
+target **−34%** sooner on CIFAR-100 and **−40%** sooner on Tiny ImageNet. On
+SVHN it does not win on time — the boundary case documented below. Against the
+published SAM+SGD recipe specifically it is ahead on accuracy on three of four
+datasets and reaches the target in more seeds on two.
 
 The **allocation control** matters more than the amount: uniform periodic SAM
 at equal-or-greater budget reaches only 0.8183 ± 0.0016 on CIFAR-100, i.e.
@@ -46,6 +60,41 @@ floor) at **−29% wall-clock**, and beats it by **0.063 nats at equal
 wall-clock**. Whether SAM is worth using at all for LM *pretraining* is a
 separate question, and our answer is "marginally, and not under heavy data
 repetition" — see [Phase 7](#phases).
+
+## Relation to published results
+
+Every baseline above was **re-run inside this pipeline** — same architecture,
+data, augmentation, epoch budget, seeds and GPU. That is not laziness about
+citing numbers, it is a requirement: the claim is about *wall-clock*, and
+wall-clock cannot be compared across papers, implementations and hardware. An
+accuracy taken from another paper has no time attached to it.
+
+The published method in the table above is therefore SAM itself, re-run here
+rather than quoted. For external calibration, the SAM paper
+([Foret et al., 2021](https://arxiv.org/abs/2010.01412), Table 1) reports 12.8%
+CIFAR-100 error for SAM and 16.1% for its SGD baseline on WideResNet-28-10 —
+trained for **1800 epochs with AutoAugment**. This work trains a wide
+ResNet-110 for **100 epochs** with flip/cutout/colour-jitter, so the two are
+not comparable and no cross-paper accuracy claim is made. The useful read is a
+sanity one: our in-pipeline SAM baselines land near that paper's 1800-epoch
+*SGD* number while training ~18x fewer epochs, which is evidence that the
+baselines being beaten here are not weak ones.
+
+**Known gap.** The closest published *allocation* method, late-phase SAM
+(below), has not yet been re-run in this pipeline; `arm_O` is not a faithful
+stand-in for it, since it switches SAM on mid-cycle over a Muon-catapult base
+rather than over plain SGD with a standard schedule. Until that arm exists,
+the comparison against that specific paper is argued, not measured.
+
+The published result this work builds on directly is **late-phase SAM**
+([arXiv:2410.10373](https://arxiv.org/abs/2410.10373)), which showed that SAM
+applied only late can match full SAM. That paper fixes the switch point, uses
+SGD only, and reports no wall-clock recipe; the contribution here is the
+allocation *shape* (a tail owning a fresh anneal, versus the same budget spread
+uniformly or bolted mid-cycle), a Muon refiner, and the wall-clock framing.
+Closest prior art for the cheap-to-expensive hand-off itself is SWATS
+([Keskar & Socher, 2017](https://arxiv.org/abs/1712.07628)), which switches
+Adam to SGD on a convergence trigger rather than allocating a sharpness budget.
 
 ## Honest scope
 
