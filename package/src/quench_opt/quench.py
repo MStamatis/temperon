@@ -178,15 +178,27 @@ class Quench:
                 p.sub_(e_w)
 
     @torch.no_grad()
-    def _hand_off(self) -> None:
-        """Switch to the tail optimizer, optionally carrying momentum over."""
+    def _hand_off(self) -> int:
+        """Switch to the tail optimizer, optionally carrying momentum over.
+
+        Only parameters the tail optimizer actually owns receive a buffer, and
+        only if the cheap optimizer had one for them. A raw copy is exact here:
+        SGD's and Muon's `momentum_buffer` both accumulate a discounted sum of
+        gradients, and there is no second moment to mis-seed.
+        """
+        n = 0
         if self.transfer == "momentum":
-            for p in self._opt.param_groups:
-                for param in p["params"]:
-                    buf = self._opt.state.get(param, {}).get("momentum_buffer")
+            old_params = {p for g in self._opt.param_groups for p in g["params"]}
+            for group in self._tail_opt.param_groups:
+                for p in group["params"]:
+                    if p not in old_params:
+                        continue
+                    buf = self._opt.state.get(p, {}).get("momentum_buffer")
                     if buf is not None:
-                        self._tail_opt.state[param]["momentum_buffer"] = buf.clone()
+                        self._tail_opt.state[p]["momentum_buffer"] = buf.detach().clone()
+                        n += 1
         self._switched = True
+        return n
 
     # --- checkpointing --------------------------------------------------------
 

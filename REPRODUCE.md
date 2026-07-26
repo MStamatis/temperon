@@ -131,6 +131,31 @@ Outputs: `results/phase8/<task>/<arm>/seed<seed>/result.json`.
 (standard GLUE practice); `final_score` is reported as secondary. This was
 fixed before any Phase-8 result was inspected.
 
+## 5. Package equivalence
+
+The `quench-opt` library in `package/` must reproduce the research code
+exactly; that is what lets the numbers above transfer to it without re-running
+anything. The check is a fixed-seed trajectory comparison, which is *stronger*
+than re-benchmarking: the 5-seed spread is ±0.0034, so a subtle bug would hide
+under seed noise, while a trajectory diff is exact.
+
+```bash
+./eos.sh env PYTHONPATH=/workspace/package/src python -m pytest tests/test_equivalence.py -q
+```
+
+It compares the SAM gate step and rho ramp against the `sam_catapult`
+controller, the perturbation geometry and two-pass sequencing against the `SAM`
+wrapper as `train/loop.py` drives it, and momentum transfer against
+`HandoffController._copy_momentum`. Trajectories must match **bit-for-bit**;
+the assertion prints the max absolute deviation when they do not. The tests
+skip themselves if `quench_opt` is not importable.
+
+The package's own suite runs standalone:
+
+```bash
+./eos.sh env PYTHONPATH=/workspace/package/src python -m pytest package/tests -q
+```
+
 ## Notes on timing hygiene
 
 - Epoch 0 is always 3-4x slower (autotune); first-hit medians and per-epoch
