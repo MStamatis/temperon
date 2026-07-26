@@ -19,6 +19,9 @@ dependencies = [
     "tiktoken",
     "huggingface_hub",
     "pyarrow",
+    # Phase 8 (GLUE fine-tuning): pretrained encoders + task data.
+    "transformers",
+    "datasets",
 ]
 
 [dependency-groups]
