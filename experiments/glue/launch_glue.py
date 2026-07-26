@@ -28,6 +28,11 @@ def main() -> None:
     ap.add_argument("--seeds", nargs="+", type=int, default=SEEDS)
     ap.add_argument("--output", default="results/phase8")
     ap.add_argument("--config", default="configs/glue_base.yaml")
+    ap.add_argument("--set", nargs="*", default=[], dest="overrides",
+                    metavar="KEY=VALUE",
+                    help="config overrides passed to every run, e.g. rho=0.01. "
+                         "Use a separate --output per setting: the skip-if-done "
+                         "check keys on the path, not on the overrides.")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -53,6 +58,8 @@ def main() -> None:
         cmd = [sys.executable, os.path.join(HERE, "train_glue.py"),
                "--task", task, "--arm", arm, "--seed", str(seed),
                "--config", args.config, "--output", args.output]
+        if args.overrides:
+            cmd += ["--set", *args.overrides]
         el = time.perf_counter() - t0
         print(f"\n=== [{i}/{len(jobs)}] {task} {arm} seed{seed} "
               f"(elapsed {el/60:.0f} min) ===", flush=True)
