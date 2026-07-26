@@ -30,6 +30,8 @@ ROOT = sys.argv[1] if len(sys.argv) > 1 else "results"
 TARGETS = {
     "c100": [0.78, 0.80, 0.82, 0.83],
     "tiny": [0.65, 0.68, 0.69, 0.70],
+    "c10": [0.96, 0.965, 0.968, 0.97],
+    "svhn": [0.96, 0.97, 0.975, 0.98],
 }
 
 # display name -> (path under ROOT, dataset)
@@ -44,6 +46,14 @@ ARMS = {
     "full SAM+Muon tiny": ("bench/tiny/tiny_sammuon", "tiny"),
     "full SAM+SGD tiny":  ("bench/tiny/tiny_samsgd", "tiny"),
     "tuned SGD tiny":     ("bench/tiny/tiny_strongsgd", "tiny"),
+    "Temperon c10":       ("phase6/arm_P_c10", "c10"),
+    "full SAM+Muon c10":  ("bench/c10/c10_sammuon", "c10"),
+    "full SAM+SGD c10":   ("bench/c10/c10_samsgd", "c10"),
+    "tuned SGD c10":      ("bench/c10/c10_strongsgd", "c10"),
+    "Temperon svhn":      ("phase6/arm_P_svhn", "svhn"),
+    "full SAM+Muon svhn": ("bench/svhn/svhn_sammuon", "svhn"),
+    "full SAM+SGD svhn":  ("bench/svhn/svhn_samsgd", "svhn"),
+    "tuned SGD svhn":     ("bench/svhn/svhn_strongsgd", "svhn"),
 }
 
 
@@ -114,7 +124,7 @@ def main():
         print(f"  {name:<22} {cells}")
 
     # --- epochs to target + predicted clean seconds ---------------------------
-    for ds in ["c100", "tiny"]:
+    for ds in ["c100", "tiny", "c10", "svhn"]:
         arms = [(n, r) for n, (r, d) in data.items() if d == ds]
         if not arms:
             continue
