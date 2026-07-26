@@ -1,9 +1,13 @@
-# Quench
+# Temperon
 
 **Pay for sharpness-aware minimization only where it pays you back.**
 
+*Tempering* is the controlled heat treatment that follows quenching and sets a
+metal's final toughness. This package governs the training equivalent: what
+happens during the last anneal.
+
 [SAM](https://arxiv.org/abs/2010.01412) improves generalization but doubles the
-cost of every training step, which is why most people skip it. Quench runs SAM
+cost of every training step, which is why most people skip it. Temperon runs SAM
 for a contiguous tail aligned to your learning-rate decay instead of the whole
 run. In our experiments that reaches full-time-SAM quality for roughly a third
 less wall-clock — and spreading the same SAM budget uniformly across training
@@ -14,19 +18,19 @@ does *worse* than either extreme.
 > DDP and gradient accumulation are not supported yet.
 
 ```bash
-pip install quench-opt
+pip install temperon
 ```
 
 ## Usage
 
 ```python
 import torch
-from quench_opt import Quench, wsd
+from temperon import Temperon, wsd
 
 base = torch.optim.AdamW(model.parameters(), lr=2e-5)
 total = len(loader) * epochs
 
-opt = Quench(base, total_steps=total, tail_frac=0.3, rho=0.05)
+opt = Temperon(base, total_steps=total, tail_frac=0.3, rho=0.05)
 sched = torch.optim.lr_scheduler.LambdaLR(base, wsd(total, 250, decay_frac=0.3))
 
 for batch in loader:
@@ -42,7 +46,7 @@ for batch in loader:
 ```
 
 The closure follows the `torch.optim.LBFGS` convention: zero the gradients,
-compute the loss, call `backward()`, return the loss. Quench calls it once per
+compute the loss, call `backward()`, return the loss. Temperon calls it once per
 step during the cheap phase and twice during the tail. Nothing else in your
 training code changes.
 
@@ -52,7 +56,7 @@ training code changes.
 complete anneal. This is not a detail: in our ablations a SAM tail bolted onto
 the middle of an ongoing cycle gained nothing at all (flat in tail length,
 ~1pp below full SAM), while a tail owning a fresh anneal matched full-time SAM.
-Pass the same fraction to `wsd(..., decay_frac=f)` and `Quench(tail_frac=f)`
+Pass the same fraction to `wsd(..., decay_frac=f)` and `Temperon(tail_frac=f)`
 and the alignment is exact.
 
 ### Cheap explorer, expensive refiner
@@ -61,12 +65,12 @@ You can also switch optimizers at the same boundary — a cheap explorer for mos
 of training, then a stronger optimizer owning the SAM tail:
 
 ```python
-from quench_opt import cosine_tail
+from temperon import cosine_tail
 
 explorer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
 refiner  = Muon(model.parameters(), lr=0.01, weight_decay=0.2)
 
-opt = Quench(explorer, total_steps=total, tail_frac=0.57,
+opt = Temperon(explorer, total_steps=total, tail_frac=0.57,
              tail_optimizer=refiner, transfer="momentum")
 sched = torch.optim.lr_scheduler.LambdaLR(explorer, cosine_tail(total, 0.57))
 ```
@@ -77,7 +81,7 @@ sched = torch.optim.lr_scheduler.LambdaLR(explorer, cosine_tail(total, 0.57))
 
 Measured limits, stated because they define where the method applies:
 
-- **A cheap optimizer wins below its own ceiling.** Quench never accelerates an
+- **A cheap optimizer wins below its own ceiling.** Temperon never accelerates an
   accuracy target that plain SGD or Adam can already reach; it accelerates
   targets that only expensive methods reach at all. If your target is modest,
   use the cheap optimizer.
@@ -91,7 +95,7 @@ Measured limits, stated because they define where the method applies:
 
 ## Citing
 
-See [CITATION.cff](https://github.com/MStamatis/quench/blob/main/CITATION.cff).
+See [CITATION.cff](https://github.com/MStamatis/temperon/blob/main/CITATION.cff).
 The research code and the full experimental record — including the negative
 controls this claim rests on — live in the same repository.
 

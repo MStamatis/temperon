@@ -1,4 +1,4 @@
-"""Quench: allocate the sharpness-aware budget to the final anneal.
+"""Temperon: allocate the sharpness-aware budget to the final anneal.
 
 Sharpness-Aware Minimization doubles the cost of every step. The measured
 finding behind this package is that it only earns that cost near the end of
@@ -6,7 +6,7 @@ training: running SAM for a contiguous tail aligned to the learning-rate decay
 reaches full-time-SAM quality for roughly a third less wall-clock, while
 spreading the same budget uniformly over training does *worse* than either.
 
-`Quench` wraps an ordinary optimizer and drives SAM's two passes itself, so the
+`Temperon` wraps an ordinary optimizer and drives SAM's two passes itself, so the
 allocation is a scheduling decision rather than a change to your model code.
 """
 
@@ -19,7 +19,7 @@ import torch
 Transfer = Literal["momentum", "none"]
 
 
-class Quench:
+class Temperon:
     """Run `optimizer` normally, then hand the final `tail_frac` of training to
     SAM (optionally switching to a second optimizer at the same boundary).
 
@@ -31,7 +31,7 @@ class Quench:
         tail_frac: fraction of training the SAM tail owns. **Align this with
             your learning-rate decay** -- the tail should own a full anneal.
             With a warmup-stable-decay schedule, set it equal to the decay
-            fraction (see `quench_opt.schedules.wsd`).
+            fraction (see `temperon.schedules.wsd`).
         rho: SAM neighbourhood radius.
         rho_ramp_steps: linearly ramp rho from 0 over this many steps after the
             tail opens, to soften the switch. 0 disables the ramp.
@@ -42,10 +42,10 @@ class Quench:
             tail optimizer cold.
 
     The closure follows the `torch.optim.LBFGS` convention: it must zero the
-    gradients, compute the loss, call `backward()`, and return the loss. Quench
+    gradients, compute the loss, call `backward()`, and return the loss. Temperon
     calls it once per step in the cheap phase and twice in the tail.
 
-        opt = Quench(torch.optim.AdamW(model.parameters(), lr=2e-5),
+        opt = Temperon(torch.optim.AdamW(model.parameters(), lr=2e-5),
                      total_steps=len(loader) * epochs, tail_frac=0.3)
 
         for batch in loader:
@@ -131,7 +131,7 @@ class Quench:
     def step(self, closure: Callable[[], torch.Tensor]) -> torch.Tensor:
         """One optimization step. Returns the loss at the *unperturbed* weights."""
         if closure is None:
-            raise ValueError("Quench requires a closure; see the class docstring.")
+            raise ValueError("Temperon requires a closure; see the class docstring.")
         if self.sam_active() and not self._switched and self._tail_opt is not None:
             self._hand_off()
 
@@ -219,6 +219,6 @@ class Quench:
             self._tail_opt.load_state_dict(state["tail_optimizer"])
 
     def __repr__(self) -> str:
-        return (f"Quench(tail_frac={self.tail_frac}, rho={self.rho}, "
+        return (f"Temperon(tail_frac={self.tail_frac}, rho={self.rho}, "
                 f"tail_start={self.tail_start}/{self.total_steps}, "
                 f"step={self.step_count}, sam={'on' if self.sam_active() else 'off'})")

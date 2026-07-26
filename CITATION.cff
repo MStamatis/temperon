@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software or its results, please cite it as below."
-title: "Quench: sharpness-budget allocation for wall-clock-efficient training"
+title: "Temperon: sharpness-budget allocation for wall-clock-efficient training"
 abstract: >-
   Research code for a study of where to spend an expensive training mode.
   Sharpness-Aware Minimization pays for its second pass only in the final
@@ -12,7 +12,7 @@ authors:
   - family-names: Mastromichalakis
     given-names: Stamatis
     email: stamatis@tmnetworks.gr
-repository-code: "https://github.com/MStamatis/quench"
+repository-code: "https://github.com/MStamatis/temperon"
 license: MIT
 type: software
 keywords:

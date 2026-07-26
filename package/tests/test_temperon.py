@@ -1,10 +1,10 @@
-"""Quench package tests (CPU-only)."""
+"""Temperon package tests (CPU-only)."""
 
 import pytest
 import torch
 import torch.nn as nn
 
-from quench_opt import Quench, cosine_tail, wsd
+from temperon import Temperon, cosine_tail, wsd
 
 
 def _model():
@@ -28,7 +28,7 @@ def _closure_factory(model, opt, calls):
 # --- gate ---------------------------------------------------------------------
 
 def test_tail_boundary_and_gate():
-    q = Quench(torch.optim.SGD(_model().parameters(), lr=0.1),
+    q = Temperon(torch.optim.SGD(_model().parameters(), lr=0.1),
                total_steps=1000, tail_frac=0.3)
     assert q.tail_start == 700
     assert not q.sam_active(699)
@@ -37,20 +37,20 @@ def test_tail_boundary_and_gate():
 
 def test_tail_frac_extremes():
     p = list(_model().parameters())
-    always = Quench(torch.optim.SGD(p, lr=0.1), total_steps=100, tail_frac=1.0)
+    always = Temperon(torch.optim.SGD(p, lr=0.1), total_steps=100, tail_frac=1.0)
     assert always.sam_active(0) and always.tail_start == 0
-    never = Quench(torch.optim.SGD(p, lr=0.1), total_steps=100, tail_frac=0.0)
+    never = Temperon(torch.optim.SGD(p, lr=0.1), total_steps=100, tail_frac=0.0)
     assert not any(never.sam_active(s) for s in range(100))
 
 
 def test_rho_ramp():
-    q = Quench(torch.optim.SGD(_model().parameters(), lr=0.1),
+    q = Temperon(torch.optim.SGD(_model().parameters(), lr=0.1),
                total_steps=100, tail_frac=0.5, rho=0.05, rho_ramp_steps=4)
     assert q.current_rho(49) == 0.0                      # cheap phase
     assert q.current_rho(50) == pytest.approx(0.05 * 0.25)
     assert q.current_rho(53) == pytest.approx(0.05)
     assert q.current_rho(90) == pytest.approx(0.05)      # capped
-    flat = Quench(torch.optim.SGD(_model().parameters(), lr=0.1),
+    flat = Temperon(torch.optim.SGD(_model().parameters(), lr=0.1),
                   total_steps=100, tail_frac=0.5, rho=0.05)
     assert flat.current_rho(50) == 0.05
 
@@ -58,20 +58,20 @@ def test_rho_ramp():
 def test_invalid_arguments():
     p = list(_model().parameters())
     with pytest.raises(ValueError):
-        Quench(torch.optim.SGD(p, lr=0.1), total_steps=0)
+        Temperon(torch.optim.SGD(p, lr=0.1), total_steps=0)
     with pytest.raises(ValueError):
-        Quench(torch.optim.SGD(p, lr=0.1), total_steps=10, tail_frac=1.5)
+        Temperon(torch.optim.SGD(p, lr=0.1), total_steps=10, tail_frac=1.5)
     with pytest.raises(ValueError):
-        Quench(torch.optim.SGD(p, lr=0.1), total_steps=10, rho=-1)
+        Temperon(torch.optim.SGD(p, lr=0.1), total_steps=10, rho=-1)
     with pytest.raises(ValueError):
-        Quench(torch.optim.SGD(p, lr=0.1), total_steps=10, transfer="magic")
+        Temperon(torch.optim.SGD(p, lr=0.1), total_steps=10, transfer="magic")
 
 
 # --- the two passes -----------------------------------------------------------
 
 def test_closure_called_once_cheap_twice_in_tail():
     model = _model()
-    q = Quench(torch.optim.SGD(model.parameters(), lr=0.1),
+    q = Temperon(torch.optim.SGD(model.parameters(), lr=0.1),
                total_steps=4, tail_frac=0.5)
     calls: list[int] = []
     closure = _closure_factory(model, q, calls)
@@ -89,7 +89,7 @@ def test_closure_called_once_cheap_twice_in_tail():
 def test_sam_from_step_zero_on_a_fresh_optimizer(make):
     """Regression: the perturbation must not pre-populate Adam's state dict."""
     model = _model()
-    q = Quench(make(model.parameters()), total_steps=4, tail_frac=1.0, rho=0.05)
+    q = Temperon(make(model.parameters()), total_steps=4, tail_frac=1.0, rho=0.05)
     closure = _closure_factory(model, q, [])
     w0 = model.weight.detach().clone()
     q.step(closure)
@@ -99,7 +99,7 @@ def test_sam_from_step_zero_on_a_fresh_optimizer(make):
 
 def test_weights_are_restored_before_the_base_step():
     model = _model()
-    q = Quench(torch.optim.SGD(model.parameters(), lr=0.0),  # lr=0: step is a no-op
+    q = Temperon(torch.optim.SGD(model.parameters(), lr=0.0),  # lr=0: step is a no-op
                total_steps=1, tail_frac=1.0, rho=0.1)
     w0 = model.weight.detach().clone()
     q.step(_closure_factory(model, q, []))
@@ -111,7 +111,7 @@ def test_weights_are_restored_before_the_base_step():
 def test_perturbation_never_enters_optimizer_state():
     model = _model()
     opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
-    q = Quench(opt, total_steps=2, tail_frac=1.0, rho=0.05)
+    q = Temperon(opt, total_steps=2, tail_frac=1.0, rho=0.05)
     q.step(_closure_factory(model, q, []))
     for p in model.parameters():
         assert "e_w" not in opt.state[p]
@@ -119,7 +119,7 @@ def test_perturbation_never_enters_optimizer_state():
 
 
 def test_step_requires_a_closure():
-    q = Quench(torch.optim.SGD(_model().parameters(), lr=0.1), total_steps=2)
+    q = Temperon(torch.optim.SGD(_model().parameters(), lr=0.1), total_steps=2)
     with pytest.raises(ValueError):
         q.step(None)
 
@@ -130,7 +130,7 @@ def test_hand_off_switches_optimizer_at_the_boundary():
     model = _model()
     cheap = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
     tail = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-    q = Quench(cheap, total_steps=4, tail_frac=0.5, tail_optimizer=tail)
+    q = Temperon(cheap, total_steps=4, tail_frac=0.5, tail_optimizer=tail)
     closure = _closure_factory(model, q, [])
 
     q.step(closure); q.step(closure)
@@ -145,7 +145,7 @@ def test_hand_off_copies_the_momentum_buffer():
     model = _model()
     cheap = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
     tail = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-    q = Quench(cheap, total_steps=4, tail_frac=0.5, tail_optimizer=tail)
+    q = Temperon(cheap, total_steps=4, tail_frac=0.5, tail_optimizer=tail)
     closure = _closure_factory(model, q, [])
     q.step(closure); q.step(closure)
 
@@ -163,7 +163,7 @@ def test_momentum_transfer_changes_the_trajectory():
         model = nn.Linear(6, 3)
         cheap = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
         tail = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
-        q = Quench(cheap, total_steps=4, tail_frac=0.5, tail_optimizer=tail,
+        q = Temperon(cheap, total_steps=4, tail_frac=0.5, tail_optimizer=tail,
                    transfer=transfer)
         torch.manual_seed(1)
         x, y = torch.randn(8, 6), torch.randn(8, 3)
@@ -185,7 +185,7 @@ def test_transfer_none_starts_cold():
     model = _model()
     cheap = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
     tail = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-    q = Quench(cheap, total_steps=2, tail_frac=0.5, tail_optimizer=tail,
+    q = Temperon(cheap, total_steps=2, tail_frac=0.5, tail_optimizer=tail,
                transfer="none")
     closure = _closure_factory(model, q, [])
     q.step(closure)
@@ -198,7 +198,7 @@ def test_transfer_none_starts_cold():
 
 def test_state_dict_roundtrip():
     model = _model()
-    q = Quench(torch.optim.AdamW(model.parameters(), lr=1e-3),
+    q = Temperon(torch.optim.AdamW(model.parameters(), lr=1e-3),
                total_steps=10, tail_frac=0.5)
     closure = _closure_factory(model, q, [])
     for _ in range(6):
@@ -206,7 +206,7 @@ def test_state_dict_roundtrip():
     sd = q.state_dict()
 
     model2 = _model()
-    q2 = Quench(torch.optim.AdamW(model2.parameters(), lr=1e-3),
+    q2 = Temperon(torch.optim.AdamW(model2.parameters(), lr=1e-3),
                 total_steps=10, tail_frac=0.5)
     q2.load_state_dict(sd)
     assert q2.step_count == 6
@@ -225,7 +225,7 @@ def test_wsd_shape_and_alignment_with_tail_frac():
     assert f(850) == pytest.approx(0.5)
     assert f(1000) == pytest.approx(0.0)
     # The documented contract: same fraction => tail opens exactly at decay.
-    q = Quench(torch.optim.SGD(_model().parameters(), lr=0.1),
+    q = Temperon(torch.optim.SGD(_model().parameters(), lr=0.1),
                total_steps=total, tail_frac=decay_frac)
     assert f(q.tail_start - 1) == 1.0 and f(q.tail_start) == pytest.approx(1.0)
     assert f(q.tail_start + 1) < 1.0

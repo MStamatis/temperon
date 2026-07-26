@@ -1,7 +1,7 @@
 [project]
-name = "quench-opt"
+name = "temperon"
 version = "0.1.0.dev0"
-description = "Quench: pay for sharpness-aware minimization only where it pays you back"
+description = "Temperon: pay for sharpness-aware minimization only where it pays you back"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -17,9 +17,9 @@ classifiers = [
 dependencies = ["torch>=2.0"]
 
 [project.urls]
-Homepage = "https://github.com/MStamatis/quench"
-Repository = "https://github.com/MStamatis/quench"
-Issues = "https://github.com/MStamatis/quench/issues"
+Homepage = "https://github.com/MStamatis/temperon"
+Repository = "https://github.com/MStamatis/temperon"
+Issues = "https://github.com/MStamatis/temperon/issues"
 
 [dependency-groups]
 dev = ["pytest>=8"]
@@ -29,7 +29,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/quench_opt"]
+packages = ["src/temperon"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,9 +1,9 @@
-# Quench
+# Temperon
 
-Research code and archival record for **Quench** — a study of *where* to spend
-an expensive training mode. Named after the controlled final cooling that sets
-a material's properties, because that is exactly what the method governs: what
-happens during the last anneal.
+Research code and archival record for **Temperon** — a study of *where* to spend
+an expensive training mode. Named after *tempering*, the controlled heat
+treatment applied after quenching that sets a metal's final toughness, because
+that is exactly what the method governs: what happens during the last anneal.
 
 The finding, in one sentence:
 
@@ -89,7 +89,7 @@ switch events), `metrics.json` (final test metrics), `nvidia_smi.txt`.
 directory still carry the project's original name: the study began as an
 investigation of *edge-of-stability-aware optimizer switching*. That hypothesis
 failed (see Phase 3 and Phase 4 below) and what survived — a single scheduled
-hand-off into a SAM-owned anneal — is a different method, named Quench. The
+hand-off into a SAM-owned anneal — is a different method, named Temperon. The
 internal name is kept so that the archived code matches the runs that produced
 the published numbers; renaming it would gain nothing and break that match.
 
@@ -161,7 +161,7 @@ See **[REPRODUCE.md](REPRODUCE.md)** for the command behind each table above.
 ## Planned library
 
 The method will ship as a small standalone library in this repository
-(`pip install quench-opt`, `import quench_opt`), whose CI asserts that it
+(`pip install temperon`, `import temperon`), whose CI asserts that it
 reproduces the trajectories of the research code archived here. It is not
 published yet; until then this repository is the reference implementation.
 

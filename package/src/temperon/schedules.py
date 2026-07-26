@@ -1,10 +1,10 @@
 """Learning-rate schedules that give the SAM tail a full anneal to own.
 
-Quench's efficacy depends on *what the tail covers*, not just how long it is:
+Temperon's efficacy depends on *what the tail covers*, not just how long it is:
 in our ablations a tail bolted onto the middle of an existing cycle gained
 nothing, while a tail owning a complete anneal matched full-time SAM. These
 helpers make the alignment explicit -- pass the same `decay_frac` to `wsd()`
-and as `tail_frac` to `Quench`, and the tail starts exactly where decay does.
+and as `tail_frac` to `Temperon`, and the tail starts exactly where decay does.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ def wsd(total_steps: int, warmup_steps: int, decay_frac: float,
     """Warmup-Stable-Decay multiplier, for `torch.optim.lr_scheduler.LambdaLR`.
 
         sched = LambdaLR(optimizer, wsd(total, warmup=250, decay_frac=0.3))
-        opt = Quench(optimizer, total_steps=total, tail_frac=0.3)
+        opt = Temperon(optimizer, total_steps=total, tail_frac=0.3)
 
     Returns a callable mapping step -> multiplier in [min_frac, 1].
     """

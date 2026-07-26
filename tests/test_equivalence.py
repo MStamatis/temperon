@@ -1,4 +1,4 @@
-"""Equivalence: the `quench_opt` package must reproduce the research code.
+"""Equivalence: the `temperon` package must reproduce the research code.
 
 This is what lets the published numbers transfer to the library without
 re-running the benchmarks. Re-running them would be the weaker check anyway:
@@ -22,9 +22,9 @@ import pytest
 import torch
 import torch.nn as nn
 
-quench_opt = pytest.importorskip(
-    "quench_opt", reason="package/src not on PYTHONPATH; see module docstring")
-from quench_opt import Quench  # noqa: E402
+temperon = pytest.importorskip(
+    "temperon", reason="package/src not on PYTHONPATH; see module docstring")
+from temperon import Temperon  # noqa: E402
 
 from eos_switch.controllers import build_controller  # noqa: E402
 from eos_switch.controllers.handoff import HandoffController  # noqa: E402
@@ -65,7 +65,7 @@ def test_gate_opens_on_the_same_step(total, tail_frac):
         "n_cycles": 1, "rho": RHO, "sam_start_frac": 1.0 - tail_frac,
     })
     ctrl.setup(_model(), steps_per_epoch=total, total_epochs=1)
-    q = Quench(torch.optim.SGD(_model().parameters(), lr=0.1),
+    q = Temperon(torch.optim.SGD(_model().parameters(), lr=0.1),
                total_steps=total, tail_frac=tail_frac)
 
     assert ctrl._sam_start_step == q.tail_start
@@ -84,7 +84,7 @@ def test_rho_ramp_matches_in_the_sam_region(ramp):
         "sam_rho_ramp_steps": ramp,
     })
     ctrl.setup(_model(), steps_per_epoch=total, total_epochs=1)
-    q = Quench(torch.optim.SGD(_model().parameters(), lr=0.1),
+    q = Temperon(torch.optim.SGD(_model().parameters(), lr=0.1),
                total_steps=total, tail_frac=tail_frac, rho=RHO,
                rho_ramp_steps=ramp)
 
@@ -116,7 +116,7 @@ def _research_run(model, base_opt, batches, tail_start, ramp):
 
 
 def _package_run(model, base_opt, batches, total, tail_frac, ramp):
-    q = Quench(base_opt, total_steps=total, tail_frac=tail_frac, rho=RHO,
+    q = Temperon(base_opt, total_steps=total, tail_frac=tail_frac, rho=RHO,
                rho_ramp_steps=ramp)
     loss_fn = nn.functional.mse_loss
     for x, y in batches:
@@ -137,7 +137,7 @@ def test_grad_norm_geometry_matches():
     nn.functional.mse_loss(model(x), y).backward()
     opt = torch.optim.SGD(model.parameters(), lr=0.1)
     research = SAM(opt, rho=RHO)._grad_norm()
-    package = Quench(opt, total_steps=1, tail_frac=1.0, rho=RHO)._grad_norm()
+    package = Temperon(opt, total_steps=1, tail_frac=1.0, rho=RHO)._grad_norm()
     assert torch.equal(research, package)
 
 
@@ -167,7 +167,7 @@ def test_gated_trajectory_is_bit_identical(tail_frac, ramp):
     opt_b = torch.optim.SGD(b.parameters(), lr=0.1, momentum=0.9)
 
     sam = SAM(opt_a, rho=RHO)
-    q = Quench(opt_b, total_steps=n, tail_frac=tail_frac, rho=RHO,
+    q = Temperon(opt_b, total_steps=n, tail_frac=tail_frac, rho=RHO,
                rho_ramp_steps=ramp)
     loss_fn = nn.functional.mse_loss
 
@@ -213,7 +213,7 @@ def test_momentum_transfer_matches_the_handoff_controller():
             o.step()
 
     n_research = HandoffController._copy_momentum(old_a, new_a)
-    q = Quench(old_b, total_steps=10, tail_frac=0.5, tail_optimizer=new_b)
+    q = Temperon(old_b, total_steps=10, tail_frac=0.5, tail_optimizer=new_b)
     n_package = q._hand_off()
 
     assert n_research == n_package > 0
@@ -232,6 +232,6 @@ def test_transfer_is_a_copy_not_an_alias():
         old.zero_grad()
         nn.functional.mse_loss(model(x), y).backward()
         old.step()
-    Quench(old, total_steps=4, tail_frac=0.5, tail_optimizer=new)._hand_off()
+    Temperon(old, total_steps=4, tail_frac=0.5, tail_optimizer=new)._hand_off()
     for p in model.parameters():
         assert new.state[p]["momentum_buffer"] is not old.state[p]["momentum_buffer"]
