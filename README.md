@@ -1,7 +1,11 @@
-# eos-switch
+# Quench
 
-Archival research code for a study of **where** to spend an expensive training
-mode. The finding, in one sentence:
+Research code and archival record for **Quench** — a study of *where* to spend
+an expensive training mode. Named after the controlled final cooling that sets
+a material's properties, because that is exactly what the method governs: what
+happens during the last anneal.
+
+The finding, in one sentence:
 
 > Sharpness-Aware Minimization pays for its second pass only in the final
 > anneal — allocating the SAM budget to a scheduled tail reaches full-time-SAM
@@ -81,6 +85,14 @@ Results land in `results/<run_name>/seed<seed>/`: `epochs.csv`, `steps.jsonl`,
 `probes.jsonl`, `summary.csv` (first-hit milestones), `meta.json` (config +
 switch events), `metrics.json` (final test metrics), `nvidia_smi.txt`.
 
+**On the name `eos_switch`.** The Python package, the container and the working
+directory still carry the project's original name: the study began as an
+investigation of *edge-of-stability-aware optimizer switching*. That hypothesis
+failed (see Phase 3 and Phase 4 below) and what survived — a single scheduled
+hand-off into a SAM-owned anneal — is a different method, named Quench. The
+internal name is kept so that the archived code matches the runs that produced
+the published numbers; renaming it would gain nothing and break that match.
+
 ## Phases
 
 Each phase's conclusion, including the failures — they are why the final method
@@ -138,6 +150,13 @@ Batch size is fixed at 128 in all comparative vision arms
 (Edge-of-Stochastic-Stability depends on it).
 
 See **[REPRODUCE.md](REPRODUCE.md)** for the command behind each table above.
+
+## Planned library
+
+The method will ship as a small standalone library in this repository
+(`pip install quench-opt`, `import quench_opt`), whose CI asserts that it
+reproduces the trajectories of the research code archived here. It is not
+published yet; until then this repository is the reference implementation.
 
 ## Citing and license
 
