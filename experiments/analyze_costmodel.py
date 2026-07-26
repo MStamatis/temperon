@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import csv
 import glob
+import json
 import os
 import statistics as st
 import sys
@@ -65,18 +66,34 @@ def main():
     data = {name: (load(sub), ds) for name, (sub, ds) in ARMS.items()}
     data = {k: v for k, v in data.items() if v[0]}
 
-    # --- clean cost model: min epoch time per (dataset, optimizer) ------------
+    # --- clean cost model ----------------------------------------------------
+    # Preferred: a calibration measured on an idle GPU (calibrate_cost.py).
+    # Fallback: the minimum epoch time observed anywhere, which is the closest
+    # thing the existing grids offer to an uncontended measurement.
     clean: dict[tuple[str, str], float] = {}
+    calib_path = os.path.join(ROOT, "costmodel", "calibration.json")
+    calibrated = os.path.exists(calib_path)
+    if calibrated:
+        with open(calib_path) as f:
+            for ds, opts in json.load(f).items():
+                for opt, e in opts.items():
+                    clean[(ds, opt)] = e["median_s"]
+
     for _name, (runs, ds) in data.items():
         for epochs in runs.values():
             for ep, _acc, opt, s, _w in epochs:
                 if ep == 0:  # epoch 0 includes autotune
                     continue
                 key = (ds, opt)
-                clean[key] = min(clean.get(key, s), s)
+                if key not in clean or not calibrated:
+                    clean[key] = min(clean.get(key, s), s)
 
     print("=" * 74)
-    print("CLEAN COST MODEL (min observed s/epoch per optimizer, all arms)")
+    if calibrated:
+        print(f"COST MODEL (calibrated on an idle GPU: {calib_path})")
+    else:
+        print("COST MODEL (min observed s/epoch per optimizer, all arms)")
+        print("  -- fallback estimate; run calibrate_cost.py for measured costs")
     print("=" * 74)
     for (ds, opt), s in sorted(clean.items()):
         print(f"  {ds:>5} {opt:<18} {s:6.1f} s/epoch")
