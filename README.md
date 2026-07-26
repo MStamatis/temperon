@@ -1,92 +1,145 @@
 # eos-switch
 
-Research codebase extending the **OptiRoulette** meta-optimizer
-(arXiv 2603.06613) with **Edge-of-Stability (EoS)**-aware switching
-mechanisms, targeting controlled, measurable super-convergence.
+Archival research code for a study of **where** to spend an expensive training
+mode. The finding, in one sentence:
+
+> Sharpness-Aware Minimization pays for its second pass only in the final
+> anneal — allocating the SAM budget to a scheduled tail reaches full-time-SAM
+> quality for roughly a third less wall-clock on three of four vision datasets
+> and on a GPT-2-class language model. The fourth dataset is a measured
+> boundary case, not an omission.
+
+**What this is not.** This is *not* super-convergence. The method never
+accelerates an accuracy target that a cheap optimizer can already reach; it
+accelerates targets that only expensive methods reach at all. See
+[Honest scope](#honest-scope) — that boundary is measured, stated, and part of
+the result.
 
 Everything runs inside a Docker container on a single NVIDIA RTX 5090
-(Blackwell, sm_120, 32 GB VRAM).
+(Blackwell, sm_120, 32 GB VRAM). All numbers below come from runs in this
+repository; see [REPRODUCE.md](REPRODUCE.md) for the exact commands.
 
-## Setup
+## Headline results
 
-Requirements on the host: Docker (Desktop) with the NVIDIA container runtime.
-Nothing else — Python, uv and all dependencies live in the image.
+Vision, 5 seeds per arm (`42, 1181241943, 958682846, 271828, 314159`),
+wide ResNet-110, 100 epochs. "Hand-off" = cyclic SGD explorer for 43 epochs,
+one scheduled switch, then a SAM+Muon tail owning a fresh cosine anneal.
 
-```bash
-# 1. (only after changing pyproject.toml) regenerate the lock file:
-docker compose run --rm lock
+| dataset | hand-off | best full-SAM baseline | verdict | time to top target |
+|---|---|---|---|---|
+| CIFAR-100 | 0.8295 ± 0.0034 | SAM+Muon 0.8292 ± 0.0021 | tie (p=0.87) | 0.82 @ 4364s vs 6624s (**−34%**) |
+| Tiny ImageNet | 0.7003 ± 0.0033 | SAM+SGD 0.7027 ± 0.0032 | tie (p=0.29) | 0.69 @ 6602s vs 10935s (**−40%**) |
+| CIFAR-10 | 0.9695 ± 0.0008 | SAM+Muon 0.9694 ± 0.0008 | tie (p=0.94) | 0.968 @ 4418s vs 8052s |
+| SVHN | 0.9807 ± 0.0005 | SAM+Muon 0.9804 ± 0.0003 | tie (p=0.28) | **no time win** (boundary case) |
 
-# 2. build the image — installs PyTorch >= 2.7 with CUDA 12.8 wheels,
-#    which is REQUIRED for the RTX 5090 (sm_120). The effective install is:
-#    uv sync against pyproject/uv.lock with torch pinned to the
-#    https://download.pytorch.org/whl/cu128 index.
-docker compose build dev
+The **allocation control** matters more than the amount: uniform periodic SAM
+at equal-or-greater budget reaches only 0.8183 ± 0.0016 on CIFAR-100, i.e.
+1.12pp below the hand-off (p=0.001) while spending more time.
 
-# 3. start the long-lived dev container and install the project (editable):
-docker compose up -d dev
-docker compose exec dev uv sync --frozen
+Language model (GPT-2 124M, WikiText-103, 400M-token budget, 1 seed): the tail
+arm matches full-time SAM (3.3051 vs 3.3101 val loss, inside the measured noise
+floor) at **−29% wall-clock**, and beats it by **0.063 nats at equal
+wall-clock**. Whether SAM is worth using at all for LM *pretraining* is a
+separate question, and our answer is "marginally, and not under heavy data
+repetition" — see [Phase 7](#phases).
 
-# 4. verify the GPU is usable (prints torch/CUDA versions, GPU name,
-#    compute capability, runs a CUDA matmul):
-docker compose exec dev python experiments/check_env.py
-```
+## Honest scope
 
-If you ever see `no kernel image is available for execution on the device`,
-the installed torch wheels lack sm_120 support — rebuild against the cu128
-index (step 2).
+Measured limits, stated because they define where the method applies:
 
-## OptiRoulette acquisition
+- **The cheap optimizer wins below its own ceiling.** On CIFAR-100 plain SGD
+  reaches 0.80 in 1747s; the hand-off needs 4096s. SGD never reaches 0.82.
+- **The loss band is narrow and predictable**: it is the last ~1pp below the
+  cheap method's ceiling, in every dataset tested.
+- **Saturated tasks (SVHN) show no time win** — there the full recipe's early
+  cycles already reach the frontier.
+- **Data scarcity is not the same axis as task difficulty.** Forcing 20 passes
+  over a 20M-token slice made SAM *worse*, not better (Phase 7b).
 
-Route **(a)** succeeded: `optiroulette` 0.1.0 is installed **from PyPI** as a
-regular locked dependency, and its sdist source is vendored under
-[third_party/optiroulette](third_party/optiroulette) for study. The rest of
-the codebase talks to it only through
-[src/eos_switch/optimizers/optiroulette_adapter.py](src/eos_switch/optimizers/optiroulette_adapter.py).
-(Route (b), cloning `MStamatis/OptiRoulette` from GitHub, was not needed.)
+## Repository map
 
-## Layout
+This repo is the record of an eight-phase study, not a single experiment. Old
+arms are kept deliberately: the negative results are the controls that support
+the main claim.
 
 ```
 src/eos_switch/
   probes/        # curvature & stability measurement (fp32, no autocast/TF32)
-  optimizers/    # builders, OptiRoulette adapter, muon, state transfer
-  controllers/   # fixed / sequential / optiroulette / eos_switch / mpc
-  data/          # GPU-resident CIFAR with on-GPU augmentation
-  train/         # models, seeding, training loop
+  optimizers/    # muon, SAM, sharp_muon, OptiRoulette adapter, state transfer
+  controllers/   # fixed / cyclic / sam_catapult / handoff / eos_switch / ...
+  data/          # GPU-resident CIFAR/SVHN/TinyImageNet with on-GPU augmentation
+  train/         # models, seeding, training loop (drives SAM's two passes)
   report/        # run logging, plots, markdown report
-configs/         # one YAML per experiment arm
+configs/         # one YAML per experiment arm; configs/bench/ = the 4x5 matrix
+configs/bench/   # generated by experiments/gen_bench_configs.py
+experiments/     # run.py, launch_grid.py, analyze_5seed.py, lm/, glue/
 tests/           # pytest, CPU-only
-experiments/     # run.py, check_env.py, launch_grid.py
-third_party/     # vendored OptiRoulette source (study copy)
+third_party/     # vendored OptiRoulette source (MIT, same author)
 ```
+
+Results land in `results/<run_name>/seed<seed>/`: `epochs.csv`, `steps.jsonl`,
+`probes.jsonl`, `summary.csv` (first-hit milestones), `meta.json` (config +
+switch events), `metrics.json` (final test metrics), `nvidia_smi.txt`.
+
+## Phases
+
+Each phase's conclusion, including the failures — they are why the final method
+looks the way it does.
+
+- **Phase 0-1** — scaffolding, Docker, OptiRoulette adapter, probe library
+  (lambda_max, batch sharpness, preconditioned sharpness, stability margin).
+- **Phase 2** — ablation arms A-E. Warmup explains most of the apparent gain;
+  the catapult hypothesis was not supported.
+- **Phase 3** — EoS-aware switching controller (arm F), three iterations. All
+  failed to beat a tuned baseline: either inert or plateau→thrash→diverge.
+- **Phase 4** — per-layer Muon pool with a UCB bandit (arm G). Best controlled
+  arm of its era but still below the tuned baseline; per-layer specialization
+  was weak and seed-dependent.
+- **Phase 5** — SAM+Muon-catapult found by 2x2 ablation: SAM buys
+  generalization, the catapult buys epoch-speed, and the two are separable.
+  Single-pass sharpness surrogates (SharpMuon) failed to recover SAM.
+- **Phase 6** — **the paper.** Sharpness-budget allocation: `arm_O` (tail-SAM
+  on a catapult continuation) *fails*, `arm_P` (hand-off into a fresh anneal)
+  wins. That contrast is the evidence that *what precedes the tail* matters.
+  Controls: uniform periodic SAM, and MSAM as a literature rival (eliminated).
+- **Phase 7** — LM transfer (`experiments/lm/`). The allocation law transfers;
+  SAM itself is marginal for pretraining at 8 passes and harmful at 20.
+- **Phase 8** — LM fine-tuning on GLUE (`experiments/glue/`), where SAM's
+  language-model gains are established in the literature and its 2x cost is
+  the adoption barrier. In progress.
+
+## Setup
+
+Host requirements: Docker (Desktop) with the NVIDIA container runtime. Python,
+uv and all dependencies live in the image.
+
+```bash
+docker compose build dev          # PyTorch >= 2.7 on the cu128 index (sm_120)
+docker compose up -d dev
+docker compose exec dev uv sync --frozen
+docker compose exec dev python experiments/check_env.py
+```
+
+If you see `no kernel image is available for execution on the device`, the
+installed torch wheels lack sm_120 support — rebuild against the cu128 index.
+
+On Windows, `./eos.ps1 <command>` forwards a command into the running
+container, which is how every run in this repo was launched.
 
 ## Running
 
 ```bash
-# Smoke run (<5 min, also works on CPU): CIFAR-10 subset 5k, 3 epochs
-docker compose exec dev python experiments/run.py --config configs/smoke.yaml --smoke
-
-# Any experiment arm
-docker compose exec dev python experiments/run.py --config configs/<arm>.yaml
-
-# Tests (CPU)
-docker compose exec dev pytest
+./eos.ps1 python experiments/run.py --config configs/arm_P_handoff.yaml
+./eos.ps1 python -m pytest tests/ -q
 ```
 
-Each run writes to `results/<run_name>/seed<seed>/`:
-`steps.jsonl` (per-step loss/lr/optimizer/sharpness/wall-clock),
-`probes.jsonl`, `epochs.csv`, `summary.csv` (first-hit milestones included),
-`meta.json` (config + switch events), `nvidia_smi.txt`.
+Batch size is fixed at 128 in all comparative vision arms
+(Edge-of-Stochastic-Stability depends on it).
 
-Default seeds: `42, 1181241943, 958682846`. Batch size is fixed at 128 in
-all comparative arms (Edge-of-Stochastic-Stability depends on it).
+See **[REPRODUCE.md](REPRODUCE.md)** for the command behind each table above.
 
-## Phases
+## Citing and license
 
-- **Phase 0**: scaffolding, Docker, OptiRoulette adapter — done.
-- **Phase 1**: probes library (lambda_max, batch sharpness, preconditioned
-  sharpness, stability margin) — see `src/eos_switch/probes/`.
-- **Phase 2**: ablation harness, arms A-E (schedule effect vs switching
-  effect) — configs `arm_*.yaml`.
-- **Phase 3+**: EoS-aware switching controller, per-layer Muon pool,
-  sharpness-MPC. Not yet run.
+MIT (see [LICENSE](LICENSE)). Citation metadata in
+[CITATION.cff](CITATION.cff). The vendored OptiRoulette under `third_party/`
+is MIT by the same author.

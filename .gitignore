@@ -19,3 +19,6 @@ build/
 
 # Logs
 *.log
+
+# Local editor/agent settings (machine-specific paths, not project config)
+.claude/settings.local.json

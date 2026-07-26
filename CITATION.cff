@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software or its results, please cite it as below."
+title: "eos-switch: sharpness-budget allocation for wall-clock-efficient training"
+abstract: >-
+  Research code for a study of where to spend an expensive training mode.
+  Sharpness-Aware Minimization pays for its second pass only in the final
+  anneal: allocating the SAM budget to a scheduled tail reaches full-time-SAM
+  quality for roughly a third less wall-clock on three of four vision datasets
+  and on a GPT-2-class language model. Includes the negative controls (uniform
+  periodic SAM, tail-SAM without a fresh anneal, MSAM) that the claim rests on.
+authors:
+  - family-names: Mastromichalakis
+    given-names: Stamatis
+    email: stamatis@tmnetworks.gr
+repository-code: "https://github.com/MStamatis/eos-switch"
+license: MIT
+type: software
+keywords:
+  - pytorch
+  - optimizer
+  - sharpness-aware minimization
+  - muon
+  - wall-clock efficiency
+  - deep learning
