@@ -105,24 +105,28 @@ def main() -> None:
             sys.exit(r.returncode)
 
     # --- collect ------------------------------------------------------------
+    # Scan every measurement on disk, not just this invocation's jobs: writing
+    # the file from `jobs` alone would drop the datasets calibrated in earlier
+    # calls, which is the normal way to use this on a machine that is only free
+    # in short windows.
     table: dict[str, dict[str, dict]] = {}
-    for ds, name in jobs:
-        d = run_dir(args.output, ds, name)
-        if not os.path.exists(os.path.join(d, "epochs.csv")):
-            print(f"  !! no epochs.csv in {d}")
-            continue
-        for opt, times in epoch_times(d).items():
-            prev = table.setdefault(ds, {}).get(opt)
-            entry = {
-                "median_s": st.median(times),
-                "min_s": min(times),
-                "max_s": max(times),
-                "n": len(times),
-                "source": f"{ds}_{name}",
-            }
-            # Two configs can share an optimizer; keep the quieter measurement.
-            if prev is None or entry["median_s"] < prev["median_s"]:
-                table.setdefault(ds, {})[opt] = entry
+    for ds in DATASETS:
+        for name in CONFIGS:
+            d = run_dir(args.output, ds, name)
+            if not os.path.exists(os.path.join(d, "epochs.csv")):
+                continue
+            for opt, times in epoch_times(d).items():
+                prev = table.setdefault(ds, {}).get(opt)
+                entry = {
+                    "median_s": st.median(times),
+                    "min_s": min(times),
+                    "max_s": max(times),
+                    "n": len(times),
+                    "source": f"{ds}_{name}",
+                }
+                # Two configs can share an optimizer; keep the quieter one.
+                if prev is None or entry["median_s"] < prev["median_s"]:
+                    table[ds][opt] = entry
 
     os.makedirs(args.output, exist_ok=True)
     path = os.path.join(args.output, "calibration.json")
@@ -136,7 +140,10 @@ def main() -> None:
         for opt in sorted(table[ds]):
             e = table[ds][opt]
             spread = 100 * (e["max_s"] / e["min_s"] - 1)
-            flag = "  <- NOISY, machine was not idle" if spread > 5 else ""
+            # A handful of epochs jitter a few percent on an idle GPU; real
+            # contention showed up as 30-50% in the grids that provoked this
+            # script, so flag well above the noise rather than inside it.
+            flag = "  <- NOISY, machine was not idle" if spread > 12 else ""
             print(f"{ds:>7} {opt:<18} {e['median_s']:7.1f}s {e['min_s']:7.1f}s "
                   f"{e['max_s']:7.1f}s  {spread:4.1f}%{flag}")
     print(f"\ntotal {(time.perf_counter()-t0)/60:.0f} min")
