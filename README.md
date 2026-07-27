@@ -193,6 +193,13 @@ Measured limits, stated because they define where the method applies:
   (RTE −2.24pp, p=0.046); ρ=0.02 and ρ=0.01 stop the damage but never turn it
   into a gain (RTE +0.14pp p=0.845, MRPC +0.27pp p=0.519). The Phase 8 result
   is that the *tail* beats *full-time* SAM at −36% time — not that SAM helps.
+- **Part of that Phase 8 margin was ρ, and we checked.** Re-running the tail at
+  ρ=0.02, where full-time SAM is no longer harmful, splits the tasks: on MRPC
+  the tail still wins (+1.11pp, p=0.023, against +1.31pp at ρ=0.05), but on RTE
+  the advantage disappears (−0.43pp, p=0.516, against +2.74pp at ρ=0.05). So
+  RTE's contribution was the tail harming less, and MRPC's was not. RTE is also
+  the task whose measured noise floor is largest (0.0181, dev set 277
+  examples), which is why it was flagged as fragile before this was run.
 
 ## Repository map
 

@@ -48,8 +48,9 @@ def main() -> None:
         rho, root = spec.split(":", 1)
         pairs.append((rho, root))
 
-    print("full-time SAM vs the no-SAM baseline, by rho (best dev, 5 seeds)")
-    print(f"baseline `off` read from: {base_root}\n")
+    print("SAM arms vs the no-SAM baseline, by rho (best dev, 5 seeds)")
+    print(f"baseline `off` read from: {base_root}")
+    print("`off` does not use rho, so the same baseline is reused throughout.\n")
     for task in TASKS:
         off = scores(base_root, task, "off")
         if not off:
@@ -57,16 +58,24 @@ def main() -> None:
         print(f"=== {task.upper()} ===   off {st.mean(off):.4f} +/- "
               f"{st.stdev(off):.4f}  (n={len(off)})")
         for rho, root in pairs:
-            full = scores(root, task, "full")
-            if not full:
-                print(f"   rho {rho:>5}: (no runs)")
-                continue
-            t, df, p = welch(full, off)
-            delta = 100 * (st.mean(full) - st.mean(off))
-            verdict = "HELPS" if delta > 0 and p < 0.05 else (
-                "hurts" if delta < 0 and p < 0.05 else "n.s.")
-            print(f"   rho {rho:>5}: {st.mean(full):.4f} +/- {st.stdev(full):.4f}"
-                  f"  {delta:+.2f}pp vs off  p={p:.3f}  {verdict}  (n={len(full)})")
+            for arm in ("full", "tail"):
+                v = scores(root, task, arm)
+                if not v:
+                    continue
+                t, df, p = welch(v, off)
+                delta = 100 * (st.mean(v) - st.mean(off))
+                verdict = "HELPS" if delta > 0 and p < 0.05 else (
+                    "hurts" if delta < 0 and p < 0.05 else "n.s.")
+                print(f"   rho {rho:>5} {arm:>4}: {st.mean(v):.4f} +/- "
+                      f"{st.stdev(v):.4f}  {delta:+.2f}pp vs off  p={p:.3f}"
+                      f"  {verdict}  (n={len(v)})")
+            # The allocation claim itself: does the tail still beat full-time
+            # SAM once rho is small enough that full-time SAM stops hurting?
+            full, tail = scores(root, task, "full"), scores(root, task, "tail")
+            if full and tail:
+                t, df, p = welch(tail, full)
+                print(f"   rho {rho:>5}  ->  tail vs full "
+                      f"{100*(st.mean(tail)-st.mean(full)):+.2f}pp  p={p:.3f}")
         print()
 
 
