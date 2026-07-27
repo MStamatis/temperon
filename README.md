@@ -32,23 +32,40 @@ one scheduled switch, then a SAM+Muon tail owning a fresh cosine anneal.
 Both full-time-SAM baselines are shown on every dataset: **SAM+SGD** is the
 published recipe ([Foret et al., 2021](https://arxiv.org/abs/2010.01412))
 re-run here, and **SAM+Muon** is this project's own stronger combination.
-Cells give final test accuracy (5-seed mean ± sd) and, below, the wall-clock
-median to the hardest target that any method reaches, with the fraction of
-seeds that reach it.
+Cells give final test accuracy (5-seed mean ± sd) and, below, the time to the
+hardest target that any method reaches, with the fraction of seeds reaching it.
+
+**How the times are obtained.** Not by reading a stopwatch on the training
+runs. Raw wall-clock on a workstation is not a property of the method: a GPU
+that is also driving a monitor loses 20–28% of every epoch to the desktop, and
+we measured the same optimizer costing anywhere from 14.3 to 21.9 s/epoch
+depending only on when the grid happened to be scheduled. Each figure below is
+therefore **epochs-to-target × calibrated seconds-per-epoch** — the first
+factor measured from the runs and immune to load, the second measured
+separately on an idle GPU by
+[`calibrate_cost.py`](experiments/calibrate_cost.py). That is also the only
+form another reader can use, since their seconds-per-epoch will differ from
+ours. Raw wall-clock is kept alongside in
+[`analysis_costmodel.txt`](results/latesam/analysis_costmodel.txt).
 
 | dataset (target) | Temperon | SAM+SGD *(published, re-run)* | SAM+Muon *(ours, full-time)* |
 |---|---|---|---|
-| **CIFAR-100** (0.82) | **0.8295 ± 0.0034**<br>4364s · 5/5 | 0.8232 ± 0.0031<br>5356s · 4/5 | 0.8292 ± 0.0021<br>6624s · 5/5 |
-| **Tiny ImageNet** (0.69) | 0.7003 ± 0.0033<br>**6602s** · 5/5 | **0.7027 ± 0.0032**<br>10935s · 5/5 | 0.6838 ± 0.0019<br>never |
-| **CIFAR-10** (0.968) | **0.9695 ± 0.0008**<br>**4418s** · 5/5 | 0.9668 ± 0.0005<br>4646s · 1/5 | 0.9694 ± 0.0008<br>8052s · 5/5 |
-| **SVHN** (0.98) | **0.9807 ± 0.0005**<br>8035s · 5/5 | 0.9798 ± 0.0004<br>6692s · 3/5 | 0.9804 ± 0.0003<br>**4820s** · 5/5 |
+| **CIFAR-100** (0.82) | **0.8295 ± 0.0034**<br>4643s · 5/5 | 0.8232 ± 0.0031<br>4679s · 4/5 | 0.8292 ± 0.0021<br>7190s · 5/5 |
+| **Tiny ImageNet** (0.69) | 0.7003 ± 0.0033<br>**6359s** · 5/5 | **0.7027 ± 0.0032**<br>9333s · 5/5 | 0.6838 ± 0.0019<br>never |
+| **CIFAR-10** (0.968) | **0.9695 ± 0.0008**<br>**4849s** · 5/5 | 0.9668 ± 0.0005<br>4990s · 1/5 | 0.9694 ± 0.0008<br>7371s · 5/5 |
+| **SVHN** (0.98) | **0.9807 ± 0.0005**<br>6948s · 5/5 | 0.9798 ± 0.0004<br>7029s · 3/5 | 0.9804 ± 0.0003<br>**5084s** · 5/5 |
 
 Read that as: Temperon **ties the best full-time-SAM recipe on accuracy
 everywhere** (Welch p = 0.87 / 0.29 / 0.94 / 0.28) while reaching the hard
-target **−34%** sooner on CIFAR-100 and **−40%** sooner on Tiny ImageNet. On
-SVHN it does not win on time — the boundary case documented below. Against the
-published SAM+SGD recipe specifically it is ahead on accuracy on three of four
-datasets and reaches the target in more seeds on two.
+target **−35%** sooner on CIFAR-100, **−34%** on CIFAR-10 and **−32%** on Tiny
+ImageNet. On SVHN it does not win on time — the boundary case documented below.
+Against the published SAM+SGD recipe specifically it is ahead on accuracy on
+three of four datasets (+0.63pp p=0.016, +0.27pp p<0.001, +0.09pp p=0.015) and
+reaches the target in more seeds on two.
+
+Against that same recipe it is **level on time — within 3% on all four
+datasets** — which is the more interesting number, because it is not a
+coincidence. See [the exchange rate](#the-exchange-rate) below.
 
 The **allocation control** matters more than the amount: uniform periodic SAM
 at equal-or-greater budget reaches only 0.8183 ± 0.0016 on CIFAR-100, i.e.
@@ -60,6 +77,38 @@ floor) at **−29% wall-clock**, and beats it by **0.063 nats at equal
 wall-clock**. Whether SAM is worth using at all for LM *pretraining* is a
 separate question, and our answer is "marginally, and not under heavy data
 repetition" — see [Phase 7](#phases).
+
+## The exchange rate
+
+Skipping SAM before the switch buys a fixed credit: `43 × (cost of a SAM epoch
+− cost of a cheap epoch)`. What the run does with that credit is a choice, and
+it is the whole method.
+
+Handing the tail to Muon spends it. Muon costs **1.50×** a SAM+SGD epoch —
+1.505 / 1.509 / 1.495 / 1.497 across the four datasets, a constant we did not
+expect to be that flat — and the premium very nearly cancels the credit:
+
+| dataset | tail | credit | premium | net time | accuracy |
+|---|---|---|---|---|---|
+| CIFAR-100 | Muon | −1439s | +1294s | **−2.0%** | **+0.63pp** |
+| CIFAR-10 | Muon | −1470s | +1319s | **−2.1%** | **+0.27pp** |
+| SVHN | Muon | −2151s | +1907s | **−2.4%** | **+0.09pp** |
+| Tiny ImageNet | SGD | −2942s | **+0** | **−32.6%** | −0.24pp |
+
+*(vs the full-time SAM+SGD baseline of that dataset;
+[`analyze_allocation.py`](experiments/analyze_allocation.py))*
+
+Three datasets land within half a point of each other at −2%, which is not a
+coincidence: they are paying the same 1.50× premium out of the same credit.
+Tiny ImageNet keeps an SGD tail — the same optimizer as its baseline, so its
+premium is zero by construction — and the credit survives as a third off the
+wall-clock instead. The accuracy column tracks it exactly: banked as time,
+accuracy goes slightly down; spent on Muon, it comes back as accuracy.
+
+So the method is not "SAM, but faster". It converts a fixed allocation credit
+into accuracy at a near-constant rate, and the rate is predictable before you
+run anything: measure your refiner's cost per epoch, compare it to the credit,
+and you know which side of the trade you are on.
 
 ## Relation to published results
 
@@ -80,18 +129,44 @@ sanity one: our in-pipeline SAM baselines land near that paper's 1800-epoch
 *SGD* number while training ~18x fewer epochs, which is evidence that the
 baselines being beaten here are not weak ones.
 
-**Known gap.** The closest published *allocation* method, late-phase SAM
-(below), has not yet been re-run in this pipeline; `arm_O` is not a faithful
-stand-in for it, since it switches SAM on mid-cycle over a Muon-catapult base
-rather than over plain SGD with a standard schedule. Until that arm exists,
-the comparison against that specific paper is argued, not measured.
+### The closest rival, measured
 
 The published result this work builds on directly is **late-phase SAM**
 ([arXiv:2410.10373](https://arxiv.org/abs/2410.10373)), which showed that SAM
-applied only late can match full SAM. That paper fixes the switch point, uses
-SGD only, and reports no wall-clock recipe; the contribution here is the
-allocation *shape* (a tail owning a fresh anneal, versus the same budget spread
-uniformly or bolted mid-cycle), a Muon refiner, and the wall-clock framing.
+applied only late can match full SAM. It is re-run here at our own tuned
+hyper-parameters and a matched SAM budget (`configs/latesam/`, 5 seeds), and it
+does two things at once — one for us and one against.
+
+**For the thesis.** It reproduces full-time SAM+SGD to within noise (0.8234 ±
+0.0011 vs 0.8232 ± 0.0031, p=0.896) while paying for SAM on 57 of 100 epochs
+instead of all of them: 3022s against 4679s, **−35%**. An independent method,
+in our pipeline, arriving at the allocation law from the other direction.
+
+**Against us.** At the 0.82 target it is **34% faster than Temperon** (3022s vs
+4643s). If 0.82 is what you need on CIFAR-100, use it, not this.
+
+What it cannot do is go higher. Its accuracy is 0.8234 ± 0.0011 — a tighter
+band than any other arm here — and it reaches 0.83 in **0 of 5 seeds**, as does
+every other SGD-refined arm. Temperon reaches 0.83 in 3 of 5 at 4870s. The two
+methods are not competing for the same point on the frontier.
+
+### Which part of Temperon earns that
+
+Temperon differs from late-phase SAM in two ways at once — a Muon refiner, and
+a cyclic explorer handing over to a fresh anneal — so `arm_P_sgdtail` swaps
+*only* the refiner back to SGD and changes nothing else. It lands at 0.8210 ±
+0.0006. The verdict is unambiguous in both directions:
+
+- **The Muon refiner is the accuracy contribution**: +0.85pp (p=0.005), with
+  every other element of the method held fixed.
+- **The allocation shape is not.** At a fixed SGD refiner our shape is 0.25pp
+  *worse* than a plain cosine switched mid-schedule (p=0.005) and needs seven
+  more epochs to reach 0.82. Earlier drafts of this README claimed the shape as
+  a contribution; that claim was wrong and has been removed.
+
+The refiner sets the tier and nothing else does: every SGD-refined arm lands in
+0.8210–0.8234, every Muon-refined arm in 0.8292–0.8295.
+
 Closest prior art for the cheap-to-expensive hand-off itself is SWATS
 ([Keskar & Socher, 2017](https://arxiv.org/abs/1712.07628)), which switches
 Adam to SGD on a convergence trigger rather than allocating a sharpness budget.
@@ -101,13 +176,23 @@ Adam to SGD on a convergence trigger rather than allocating a sharpness budget.
 Measured limits, stated because they define where the method applies:
 
 - **The cheap optimizer wins below its own ceiling.** On CIFAR-100 plain SGD
-  reaches 0.80 in 1747s; the hand-off needs 4096s. SGD never reaches 0.82.
+  reaches 0.80 in 1567s; Temperon needs 4416s. SGD never reaches 0.82.
+- **A cheaper allocation wins below *its* ceiling too.** Late-phase SAM reaches
+  0.82 34% sooner than Temperon. The win here starts above 0.8234, which is
+  where every SGD-refined method stops.
 - **The loss band is narrow and predictable**: it is the last ~1pp below the
-  cheap method's ceiling, in every dataset tested.
-- **Saturated tasks (SVHN) show no time win** — there the full recipe's early
-  cycles already reach the frontier.
+  cheaper method's ceiling, in every dataset tested.
+- **Saturated tasks (SVHN) show no time win against SAM+Muon**, which reaches
+  0.98 by epoch 45 there — the accuracy is worth so little on an easy dataset
+  that the early cycles already arrive. Against the published SAM+SGD recipe
+  SVHN behaves like the others (−2.4%); it is only the Muon baseline it cannot
+  outrun.
 - **Data scarcity is not the same axis as task difficulty.** Forcing 20 passes
   over a 20M-token slice made SAM *worse*, not better (Phase 7b).
+- **SAM does not help RoBERTa fine-tuning at any ρ we tested.** ρ=0.05 hurts
+  (RTE −2.24pp, p=0.046); ρ=0.02 and ρ=0.01 stop the damage but never turn it
+  into a gain (RTE +0.14pp p=0.845, MRPC +0.27pp p=0.519). The Phase 8 result
+  is that the *tail* beats *full-time* SAM at −36% time — not that SAM helps.
 
 ## Repository map
 
