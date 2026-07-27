@@ -60,11 +60,12 @@ def cost_table():
         for ds, opts in json.load(open(p)).items():
             for opt, e in opts.items():
                 clean[(ds, opt)] = e["median_s"]
+    measured = set(clean)  # calibrated keys win; the rest fall back to min
     for ds, (_t, ours, base, _s) in CASES.items():
         for sub in (ours, base):
             for rows in runs(sub):
                 for ep, _a, opt, s in rows:
-                    if ep and ((ds, opt) not in clean or not calibrated):
+                    if ep and (ds, opt) not in measured:
                         clean[(ds, opt)] = min(clean.get((ds, opt), s), s)
     return clean, calibrated
 

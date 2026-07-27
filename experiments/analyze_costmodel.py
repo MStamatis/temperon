@@ -90,13 +90,18 @@ def main():
                 for opt, e in opts.items():
                     clean[(ds, opt)] = e["median_s"]
 
+    # Calibrated entries are authoritative; everything else falls back to the
+    # minimum observed. Guard on the calibrated key set, not on `key in clean`
+    # -- the latter accepts the FIRST fallback value and then blocks its own
+    # minimum from ever being taken.
+    measured = set(clean)
     for _name, (runs, ds) in data.items():
         for epochs in runs.values():
             for ep, _acc, opt, s, _w in epochs:
                 if ep == 0:  # epoch 0 includes autotune
                     continue
                 key = (ds, opt)
-                if key not in clean or not calibrated:
+                if key not in measured:
                     clean[key] = min(clean.get(key, s), s)
 
     print("=" * 74)
