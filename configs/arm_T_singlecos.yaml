@@ -1,0 +1,73 @@
+# Arm T: arm P with a single-cosine explorer instead of cyclic-J restarts.
+#
+# Arm S showed our allocation shape is worth -0.25pp (p=0.005) against
+# late-phase SAM at a fixed SGD refiner. But arm S differs from late-phase SAM
+# in THREE ways at once -- cyclic restarts, a fresh anneal after the hand-off,
+# and a 400-step rho ramp -- so which of them costs the 0.25pp is unknown.
+#
+# This arm removes exactly one: stage 1 becomes a single cosine over its 43
+# epochs rather than four restarting cycles. Everything else, including the
+# Muon tail, is arm_P_handoff untouched.
+#
+# It is NOT "late-phase SAM with a Muon refiner". That configuration would have
+# to run Muon in the explorer too (42.5 vs 17.3 s/epoch here), which destroys
+# the allocation credit the method exists to collect -- it is a different
+# method, not a variant of this one.
+#
+# Reading: if arm T lands above arm P's 0.8295, the cyclic explorer is costing
+# us accuracy at the Muon refiner as well, and the simpler schedule should
+# become the method -- at the price of re-running c10/svhn/tiny. If it lands at
+# or below, the cyclic explorer earns its place and arm P stands as it is.
+run_name: arm_T_singlecos
+seed: 42
+device: auto
+deterministic: false
+epochs: 100
+batch_size: 128
+mixed_precision: bf16
+grad_clip: 2.0
+model: resnet110
+initial_channels: 64
+bn_momentum: 0.01
+stem_stride: 1
+dataset:
+  name: cifar100
+  validation_split: 0
+augment:
+  enabled: true
+  cutout: 8
+  color_jitter: 0.1
+  flip: true
+controller:
+  type: handoff
+  handoff_epoch: 43
+  handoff_transfer: momentum
+  stage1:                       # THE ONLY CHANGE: n_cycles 4 -> 1
+    type: cyclic_catapult
+    base_optimizer: sgd_momentum
+    lr: 0.1
+    weight_decay: 0.0005
+    n_cycles: 1
+    t_mult: 1.0
+    warmup_steps: 200
+    min_lr: 0.0
+    momentum: 0.9
+    nesterov: true
+  stage2:                       # identical to arm_P_handoff
+    type: sam_catapult
+    base_optimizer: muon
+    lr: 0.01
+    weight_decay: 0.2
+    rho: 0.05
+    n_cycles: 1
+    t_mult: 1.0
+    warmup_steps: 200
+    ns_dtype: bf16
+    sam_freeze_bn: false
+    eos_rho: false
+    min_lr: 0.0
+    momentum: 0.9
+    nesterov: true
+    sam_rho_ramp_steps: 400
+probes:
+  enabled: false
