@@ -16,10 +16,16 @@ factor directly: a few epochs of each bench config, which between them cover
 every optimizer the paper reports (sgd_momentum, muon, sam:sgd_momentum,
 sam:muon).
 
-RUN IT ON AN IDLE GPU. Stop other containers first; `nvidia-smi` should show
-this process alone. Takes ~20 min for one dataset, ~1.5h for all four.
+RUN IT ON AN IDLE GPU. The desktop counts: if the GPU is driving a monitor,
+compositing and a browser cost 20-28% of every epoch. Detach the display (any
+second adapter will do) or leave the machine alone. Other containers must be
+stopped either way -- `nvidia-smi` should show this process alone.
 
-    python experiments/calibrate_cost.py --datasets c100 tiny
+Finished measurements are kept, so datasets can be calibrated one at a time as
+the machine frees up; delete the output directory to force a fresh one.
+
+    python experiments/calibrate_cost.py --datasets c100
+    python experiments/calibrate_cost.py --datasets tiny c10 svhn
     python experiments/calibrate_cost.py --dry-run
 
 Writes results/costmodel/calibration.json, which analyze_costmodel.py picks up
@@ -89,6 +95,10 @@ def main() -> None:
             "--config", cfg, "--seed", "42",
             "--set", f"epochs={args.epochs}",
             "--output", args.output,
+            # Calibrating one dataset at a time is the normal way to use this,
+            # so finished measurements must survive the next invocation. Delete
+            # the output directory to force a fresh measurement.
+            "--continue",
         ])
         if r.returncode != 0:
             print(f"FAILED: {ds}_{name} (exit {r.returncode})")
