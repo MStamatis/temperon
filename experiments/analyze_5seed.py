@@ -15,6 +15,8 @@ ARMS = {  # display name -> (path under ROOT, dataset)
     "arm_P_handoff":     ("phase6/arm_P_handoff", "c100"),
     "arm_P_handoff_e80": ("phase6/arm_P_handoff_e80", "c100"),
     "c100_sammuon_p2":   ("phase6/c100_sammuon_p2", "c100"),
+    # arm S: arm P with an SGD refiner -- isolates refiner from allocation shape
+    "arm_S_sgdtail":     ("phase6/arm_P_sgdtail", "c100"),
     "arm_P_tiny":        ("phase6/arm_P_tiny", "tiny"),
     "arm_P_c10":         ("phase6/arm_P_c10", "c10"),
     "arm_P_svhn":        ("phase6/arm_P_svhn", "svhn"),
@@ -220,6 +222,12 @@ pairs = [
     ("arm_P_c10", "c10_samsgd"),
     ("arm_P_svhn", "svhn_samsgd"),
     ("arm_P_handoff", "c100_strongsgd"),
+    # arm S: the 2x2's fourth cell. vs arm P the ONLY change is the refiner;
+    # vs latesam the only change is the allocation shape.
+    ("arm_P_handoff", "arm_S_sgdtail"),
+    ("arm_S_sgdtail", "latesam_c100"),
+    ("arm_S_sgdtail", "c100_samsgd"),
+    ("arm_S_sgdtail", "c100_sammuon"),
 ]
 for a, b in pairs:
     if a not in all_stats or b not in all_stats:

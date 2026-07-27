@@ -37,6 +37,7 @@ TARGETS = {
 # display name -> (path under ROOT, dataset)
 ARMS = {
     "Temperon (arm P)":   ("phase6/arm_P_handoff", "c100"),
+    "arm S (SGD tail)":   ("phase6/arm_P_sgdtail", "c100"),
     "late-phase SAM":     ("latesam/c100_latesam", "c100"),
     "full SAM+Muon":      ("bench/c100/c100_sammuon", "c100"),
     "full SAM+SGD":       ("bench/c100/c100_samsgd", "c100"),
