@@ -99,8 +99,14 @@ def _real_opt(controller):
 
 def _save_checkpoint(path, *, next_epoch, global_step, best_val_acc, model, opt,
                      controller, milestones, epoch_rows, gen, is_cuda) -> None:
-    """Atomically write the SINGLE resume checkpoint (tmp -> os.replace), so a
-    crash mid-write cannot corrupt it. Overwrites the previous one (no growth)."""
+    """Durably write the SINGLE resume checkpoint (tmp -> fsync -> os.replace).
+
+    os.replace alone only survives a crash of THIS process. An abrupt machine
+    restart can commit the rename while the temp file's blocks are still in the
+    page cache, leaving a checkpoint that torch.load rejects with
+    'failed finding central directory' -- which is exactly how one arm T seed
+    lost 40 minutes. fsync before the rename closes that window. Overwrites the
+    previous checkpoint (no growth)."""
     ckpt = {
         "next_epoch": next_epoch, "global_step": global_step, "best_val_acc": best_val_acc,
         "model": model.state_dict(), "optimizer": opt.state_dict(),
@@ -111,7 +117,10 @@ def _save_checkpoint(path, *, next_epoch, global_step, best_val_acc, model, opt,
         "rng_gen": gen.get_state(),
     }
     tmp = Path(str(path) + ".tmp")
-    torch.save(ckpt, tmp)
+    with open(tmp, "wb") as f:
+        torch.save(ckpt, f)
+        f.flush()
+        os.fsync(f.fileno())
     os.replace(tmp, path)
 
 
