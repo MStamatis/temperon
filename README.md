@@ -194,12 +194,25 @@ Measured limits, stated because they define where the method applies:
   into a gain (RTE +0.14pp p=0.845, MRPC +0.27pp p=0.519). The Phase 8 result
   is that the *tail* beats *full-time* SAM at −36% time — not that SAM helps.
 - **Part of that Phase 8 margin was ρ, and we checked.** Re-running the tail at
-  ρ=0.02, where full-time SAM is no longer harmful, splits the tasks: on MRPC
-  the tail still wins (+1.11pp, p=0.023, against +1.31pp at ρ=0.05), but on RTE
-  the advantage disappears (−0.43pp, p=0.516, against +2.74pp at ρ=0.05). So
-  RTE's contribution was the tail harming less, and MRPC's was not. RTE is also
-  the task whose measured noise floor is largest (0.0181, dev set 277
-  examples), which is why it was flagged as fragile before this was run.
+  ρ=0.02, where full-time SAM is no longer harmful, shrinks the advantage on
+  every task and removes it on one:
+
+  | tail vs full | ρ=0.05 | ρ=0.02 |
+  |---|---|---|
+  | MRPC | +1.31pp (p=0.002) | +1.11pp (p=0.023) |
+  | STSB | +0.44pp (p=0.004) | +0.24pp (p=0.063) |
+  | RTE | +2.74pp (p=0.047) | −0.43pp (p=0.516) |
+
+  So the **accuracy** advantage over full-time SAM is partly a ρ=0.05 artifact,
+  clearly surviving only on MRPC. RTE's whole margin was the tail harming less
+  — unsurprising for the task with the largest measured noise floor (0.0181,
+  dev set 277 examples), flagged as fragile before this was run.
+
+  What survives at both ρ is the **equivalence at a third of the cost**: the
+  tail is never worse than full-time SAM on any task at either ρ, while paying
+  for SAM on 30% of steps (−36% wall-clock). That is the same shape as the
+  Phase 7 LM result, and it is the claim this repository makes for fine-tuning
+  — not that the tail is more accurate.
 
 ## Repository map
 
