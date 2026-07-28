@@ -153,9 +153,11 @@ methods are not competing for the same point on the frontier.
 ### Which part of Temperon earns that
 
 Temperon differs from late-phase SAM in two ways at once — a Muon refiner, and
-a cyclic explorer handing over to a fresh anneal — so `arm_P_sgdtail` swaps
-*only* the refiner back to SGD and changes nothing else. It lands at 0.8210 ±
-0.0006. The verdict is unambiguous in both directions:
+a cyclic explorer handing over to a fresh anneal — so two ablations swap one
+piece each while holding everything else fixed: `arm_P_sgdtail` puts an SGD
+refiner behind our explorer (0.8210 ± 0.0006), and `arm_T_singlecos` keeps the
+Muon refiner but flattens the explorer's four warm restarts into a single
+cosine (0.8285 ± 0.0027). The verdict is unambiguous in every direction:
 
 - **The Muon refiner is the accuracy contribution**: +0.85pp (p=0.005), with
   every other element of the method held fixed.
@@ -163,9 +165,14 @@ a cyclic explorer handing over to a fresh anneal — so `arm_P_sgdtail` swaps
   *worse* than a plain cosine switched mid-schedule (p=0.005) and needs seven
   more epochs to reach 0.82. Earlier drafts of this README claimed the shape as
   a contribution; that claim was wrong and has been removed.
+- **Neither are the restarts.** With the Muon refiner fixed, the single-cosine
+  explorer matches the cyclic one on accuracy (+0.10pp for cyclic, p=0.61) and
+  hits 0.80 and 0.82 at the same epochs (91 and 94). It also ties full-time
+  SAM+Muon (−0.07pp, p=0.66). Any cheap schedule that lands the hand-off works;
+  the restarts are an implementation choice, not a mechanism.
 
 The refiner sets the tier and nothing else does: every SGD-refined arm lands in
-0.8210–0.8234, every Muon-refined arm in 0.8292–0.8295.
+0.8210–0.8234, every Muon-refined arm in 0.8285–0.8295.
 
 Closest prior art for the cheap-to-expensive hand-off itself is SWATS
 ([Keskar & Socher, 2017](https://arxiv.org/abs/1712.07628)), which switches

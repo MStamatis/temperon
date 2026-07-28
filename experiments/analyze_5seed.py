@@ -17,6 +17,8 @@ ARMS = {  # display name -> (path under ROOT, dataset)
     "c100_sammuon_p2":   ("phase6/c100_sammuon_p2", "c100"),
     # arm S: arm P with an SGD refiner -- isolates refiner from allocation shape
     "arm_S_sgdtail":     ("phase6/arm_P_sgdtail", "c100"),
+    # arm T: arm P with a single-cosine explorer -- isolates cyclic restarts
+    "arm_T_singlecos":   ("phase6/arm_T_singlecos", "c100"),
     "arm_P_tiny":        ("phase6/arm_P_tiny", "tiny"),
     "arm_P_c10":         ("phase6/arm_P_c10", "c10"),
     "arm_P_svhn":        ("phase6/arm_P_svhn", "svhn"),
@@ -228,6 +230,8 @@ pairs = [
     ("arm_S_sgdtail", "latesam_c100"),
     ("arm_S_sgdtail", "c100_samsgd"),
     ("arm_S_sgdtail", "c100_sammuon"),
+    ("arm_P_handoff", "arm_T_singlecos"),
+    ("arm_T_singlecos", "c100_sammuon"),
 ]
 for a, b in pairs:
     if a not in all_stats or b not in all_stats:
