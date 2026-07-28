@@ -84,9 +84,15 @@ at equal-or-greater budget reaches only 0.8183 ± 0.0016 on CIFAR-100, i.e.
 Language model (GPT-2 124M, WikiText-103, 400M-token budget, 1 seed): the tail
 arm matches full-time SAM (3.3051 vs 3.3101 val loss, inside the measured noise
 floor) at **−29% wall-clock**, and beats it by **0.063 nats at equal
-wall-clock**. Whether SAM is worth using at all for LM *pretraining* is a
-separate question, and our answer is "marginally, and not under heavy data
-repetition" — see [Phase 7](#phases).
+wall-clock**. There is no separate rival column for the LM, and the reason is
+worth stating: the tail arm here *is* the late-phase allocation — one WSD
+schedule, no explorer, no restarts, SAM switched on for the final 30% of steps
+— run with Muon as the base optimizer. On this task the two methods coincide,
+and the merged form is what wins; what this phase adds is that the allocation
+law transfers to LM pretraining, to Muon, and to a smaller SAM budget (30%
+here vs 57% in the vision runs). Whether SAM is worth using at all for LM
+*pretraining* is a separate question, and our answer is "marginally, and not
+under heavy data repetition" — see [Phase 7](#phases).
 
 ## The exchange rate
 
@@ -172,6 +178,12 @@ plain SAM+SGD and there is no higher tier for it to retreat to. Where the
 expensive refiner buys nothing, the simpler allocation is the better method;
 what Temperon keeps on that dataset is the early game (0.65 at 1322s vs 4533s,
 the cyclic explorer's head start) and nothing at the top.
+
+Beyond vision the rivalry dissolves rather than continues: the LM and GLUE
+tail arms *are* the late-phase allocation — a single schedule with SAM
+switched on late, no explorer, no restarts — run with our optimizers and
+budget, so there is no separate rival arm to compare against there. See the
+language-model paragraph under [Headline results](#headline-results).
 
 ### Which part of Temperon earns that
 
