@@ -59,6 +59,9 @@ Read that as: Temperon **ties the best full-time-SAM recipe on accuracy
 everywhere** (Welch p = 0.87 / 0.29 / 0.94 / 0.28) while reaching the hard
 target **−35%** sooner on CIFAR-100, **−34%** on CIFAR-10 and **−32%** on Tiny
 ImageNet. On SVHN it does not win on time — the boundary case documented below.
+On Tiny ImageNet the stronger comparison is not the full-time recipe but the
+late-phase rival, which wins the endgame there — see
+[the closest rival](#the-closest-rival-measured).
 Against the published SAM+SGD recipe specifically it is ahead on accuracy on
 three of four datasets (+0.63pp p=0.016, +0.27pp p<0.001, +0.09pp p=0.015) and
 reaches the target in more seeds on two.
@@ -137,18 +140,31 @@ applied only late can match full SAM. It is re-run here at our own tuned
 hyper-parameters and a matched SAM budget (`configs/latesam/`, 5 seeds), and it
 does two things at once — one for us and one against.
 
-**For the thesis.** It reproduces full-time SAM+SGD to within noise (0.8234 ±
-0.0011 vs 0.8232 ± 0.0031, p=0.896) while paying for SAM on 57 of 100 epochs
-instead of all of them: 3022s against 4679s, **−35%**. An independent method,
-in our pipeline, arriving at the allocation law from the other direction.
+**For the thesis.** It reproduces full-time SAM+SGD to within noise on both
+datasets it was run on — CIFAR-100 (0.8234 ± 0.0011 vs 0.8232 ± 0.0031,
+p=0.896) and Tiny ImageNet (0.7020 ± 0.0028 vs 0.7027 ± 0.0032, p=0.720) —
+while paying for SAM on 57 of 100 epochs instead of all of them: −35% and −29%
+respectively. An independent method, in our pipeline, arriving at the
+allocation law from the other direction.
 
-**Against us.** At the 0.82 target it is **34% faster than Temperon** (3022s vs
-4643s). If 0.82 is what you need on CIFAR-100, use it, not this.
+**Against us.** At the 0.82 target on CIFAR-100 it is **34% faster than
+Temperon** (3022s vs 4643s). If 0.82 is what you need there, use it, not this.
 
-What it cannot do is go higher. Its accuracy is 0.8234 ± 0.0011 — a tighter
-band than any other arm here — and it reaches 0.83 in **0 of 5 seeds**, as does
-every other SGD-refined arm. Temperon reaches 0.83 in 3 of 5 at 4870s. The two
-methods are not competing for the same point on the frontier.
+What it cannot do on CIFAR-100 is go higher. Its accuracy is 0.8234 ± 0.0011 —
+a tighter band than any other arm here — and it reaches 0.83 in **0 of 5
+seeds**, as does every other SGD-refined arm. Temperon reaches 0.83 in 3 of 5
+at 4870s. The two methods are not competing for the same point on the frontier.
+
+**On Tiny ImageNet it wins outright, and we say so.** There it matches
+Temperon's final accuracy (0.7020 ± 0.0028 vs 0.7003 ± 0.0033, p=0.42) and
+reaches every late target sooner at calibrated cost: 0.68 at 5344s vs 6156s,
+0.69 at 5750s vs 6359s, 0.70 in 4/5 seeds vs 3/5. The reason is structural.
+Tiny ImageNet is the one dataset where the Muon refiner does not help — full
+SAM+Muon lands 1.8pp *below* both, at 0.6838 — so Temperon's tail there is
+plain SAM+SGD and there is no higher tier for it to retreat to. Where the
+expensive refiner buys nothing, the simpler allocation is the better method;
+what Temperon keeps on that dataset is the early game (0.65 at 1322s vs 4533s,
+the cyclic explorer's head start) and nothing at the top.
 
 ### Which part of Temperon earns that
 
@@ -185,8 +201,14 @@ Measured limits, stated because they define where the method applies:
 - **The cheap optimizer wins below its own ceiling.** On CIFAR-100 plain SGD
   reaches 0.80 in 1567s; Temperon needs 4416s. SGD never reaches 0.82.
 - **A cheaper allocation wins below *its* ceiling too.** Late-phase SAM reaches
-  0.82 34% sooner than Temperon. The win here starts above 0.8234, which is
-  where every SGD-refined method stops.
+  0.82 34% sooner than Temperon on CIFAR-100. The win here starts above 0.8234,
+  which is where every SGD-refined method stops.
+- **Where the expensive refiner buys nothing, the rival wins outright.** On
+  Tiny ImageNet SAM+Muon is 1.8pp *worse* than SAM+SGD, so there is no higher
+  tier to reach — and late-phase SAM matches Temperon's accuracy there (p=0.42)
+  while reaching 0.68/0.69/0.70 sooner (−13%/−10%/−7% at calibrated cost).
+  Temperon's win condition is a dataset where the refiner actually buys a tier;
+  Tiny ImageNet is the measured counterexample.
 - **The loss band is narrow and predictable**: it is the last ~1pp below the
   cheaper method's ceiling, in every dataset tested.
 - **Saturated tasks (SVHN) show no time win against SAM+Muon**, which reaches

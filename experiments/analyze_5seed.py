@@ -220,6 +220,7 @@ pairs = [
     ("latesam_c100", "c100_strongsgd"),
     ("arm_P_tiny", "latesam_tiny"),
     ("latesam_tiny", "tiny_samsgd"),
+    ("latesam_tiny", "tiny_sammuon"),
     # vs the published full-time SAM recipe on every dataset
     ("arm_P_c10", "c10_samsgd"),
     ("arm_P_svhn", "svhn_samsgd"),
