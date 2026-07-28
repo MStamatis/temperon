@@ -59,6 +59,22 @@ the middle of an ongoing cycle gained nothing at all (flat in tail length,
 Pass the same fraction to `wsd(..., decay_frac=f)` and `Temperon(tail_frac=f)`
 and the alignment is exact.
 
+### Choosing `tail_frac`
+
+The switch point is a measured quality/cost dial, not a magic number. On
+CIFAR-100 (5 seeds, same 100-epoch budget, SGD explorer → SAM+Muon tail):
+
+| `tail_frac` | final accuracy | total cost (calibrated) |
+|---|---|---|
+| 0.57 | 0.8295 ± 0.0034 — ties full-time SAM+Muon | 5038s |
+| 0.20 | 0.8249 ± 0.0022 — −0.42pp vs full SAM+Muon (p=0.015), level with the published full SAM+SGD recipe (+0.17pp, p=0.35) | 2862s, **−43%** |
+
+A longer tail buys the expensive method's full ceiling at its full cost; a
+shorter one gives up a measured slice of that ceiling for a much cheaper run.
+The default 0.3 is the value that matched full-time SAM quality on GPT-2
+pretraining (−29% wall-clock) and GLUE fine-tuning (−36%). Below 0.2 we have
+no measurements; as `tail_frac → 1` you are simply paying for full-time SAM.
+
 ### Cheap explorer, expensive refiner
 
 You can also switch optimizers at the same boundary — a cheap explorer for most

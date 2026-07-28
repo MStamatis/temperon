@@ -31,7 +31,9 @@ recipe, `configs/arm_P_handoff.yaml`):
 2. **The switch — epoch 43, scheduled, not adaptive.** One hand-off at a fixed
    43% of the epoch budget. Momentum carries over; the incoming optimizer gets
    a 200-step LR warmup and SAM's ρ ramps from zero over 400 steps, so the
-   switch never shocks the loss.
+   switch never shocks the loss. The switch point is a measured quality/cost
+   dial: moving it to epoch 80 lands at 0.8249 ± 0.0022 (−0.42pp vs full
+   SAM+Muon, p=0.015) for 43% less total compute (`arm_P_handoff_e80`).
 3. **Refiner — epochs 44–100: SAM+Muon owning a fresh cosine anneal.** Muon
    (lr 0.01, wd 0.2) wrapped in SAM's two-pass ascent–descent (ρ=0.05),
    annealed to zero over the remaining 57 epochs. All of the SAM budget is
