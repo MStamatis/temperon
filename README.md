@@ -32,6 +32,9 @@ one scheduled switch, then a SAM+Muon tail owning a fresh cosine anneal.
 Both full-time-SAM baselines are shown on every dataset: **SAM+SGD** is the
 published recipe ([Foret et al., 2021](https://arxiv.org/abs/2010.01412))
 re-run here, and **SAM+Muon** is this project's own stronger combination.
+**Late-phase SAM** ([arXiv:2410.10373](https://arxiv.org/abs/2410.10373)) is
+the closest published rival, re-run at a matched SAM budget on the two datasets
+marked — it belongs in this table precisely because it beats us in some cells.
 Cells give final test accuracy (5-seed mean ± sd) and, below, the time to the
 hardest target that any method reaches, with the fraction of seeds reaching it.
 
@@ -48,23 +51,27 @@ form another reader can use, since their seconds-per-epoch will differ from
 ours. Raw wall-clock is kept alongside in
 [`analysis_costmodel.txt`](results/latesam/analysis_costmodel.txt).
 
-| dataset (target) | Temperon | SAM+SGD *(published, re-run)* | SAM+Muon *(ours, full-time)* |
-|---|---|---|---|
-| **CIFAR-100** (0.82) | **0.8295 ± 0.0034**<br>4643s · 5/5 | 0.8232 ± 0.0031<br>4679s · 4/5 | 0.8292 ± 0.0021<br>7190s · 5/5 |
-| **Tiny ImageNet** (0.69) | 0.7003 ± 0.0033<br>**6359s** · 5/5 | **0.7027 ± 0.0032**<br>9333s · 5/5 | 0.6838 ± 0.0019<br>never |
-| **CIFAR-10** (0.968) | **0.9695 ± 0.0008**<br>**4849s** · 5/5 | 0.9668 ± 0.0005<br>4990s · 1/5 | 0.9694 ± 0.0008<br>7371s · 5/5 |
-| **SVHN** (0.98) | **0.9807 ± 0.0005**<br>6948s · 5/5 | 0.9798 ± 0.0004<br>7029s · 3/5 | 0.9804 ± 0.0003<br>**5084s** · 5/5 |
+| dataset (target) | Temperon | late-phase SAM *(rival, re-run)* | SAM+SGD *(published, re-run)* | SAM+Muon *(ours, full-time)* |
+|---|---|---|---|---|
+| **CIFAR-100** (0.82) | **0.8295 ± 0.0034**<br>4643s · 5/5 | 0.8234 ± 0.0011<br>**3022s** · 5/5 | 0.8232 ± 0.0031<br>4679s · 4/5 | 0.8292 ± 0.0021<br>7190s · 5/5 |
+| **Tiny ImageNet** (0.69) | 0.7003 ± 0.0033<br>6359s · 5/5 | 0.7020 ± 0.0028<br>**5750s** · 5/5 | **0.7027 ± 0.0032**<br>9333s · 5/5 | 0.6838 ± 0.0019<br>never |
+| **CIFAR-10** (0.968) | **0.9695 ± 0.0008**<br>**4849s** · 5/5 | *not run* | 0.9668 ± 0.0005<br>4990s · 1/5 | 0.9694 ± 0.0008<br>7371s · 5/5 |
+| **SVHN** (0.98) | **0.9807 ± 0.0005**<br>6948s · 5/5 | *not run* | 0.9798 ± 0.0004<br>7029s · 3/5 | 0.9804 ± 0.0003<br>**5084s** · 5/5 |
 
 Read that as: Temperon **ties the best full-time-SAM recipe on accuracy
 everywhere** (Welch p = 0.87 / 0.29 / 0.94 / 0.28) while reaching the hard
 target **−35%** sooner on CIFAR-100, **−34%** on CIFAR-10 and **−32%** on Tiny
 ImageNet. On SVHN it does not win on time — the boundary case documented below.
-On Tiny ImageNet the stronger comparison is not the full-time recipe but the
-late-phase rival, which wins the endgame there — see
-[the closest rival](#the-closest-rival-measured).
-Against the published SAM+SGD recipe specifically it is ahead on accuracy on
-three of four datasets (+0.63pp p=0.016, +0.27pp p<0.001, +0.09pp p=0.015) and
-reaches the target in more seeds on two.
+
+The rival column holds the fastest time in both rows where it exists, and the
+two rows mean opposite things. On CIFAR-100 the mid target is simply not where
+Temperon competes: the rival tops out at 0.8234 and never reaches 0.83, which
+Temperon reaches in 3 of 5 seeds — the tier above is the win. On Tiny ImageNet
+there is no tier above (SAM+Muon *loses* there) and the rival's row is a plain
+defeat for us — see [the closest rival](#the-closest-rival-measured).
+Against the published SAM+SGD recipe specifically Temperon is ahead on accuracy
+on three of four datasets (+0.63pp p=0.016, +0.27pp p<0.001, +0.09pp p=0.015)
+and reaches the target in more seeds on two.
 
 Against that same recipe it is **level on time — within 3% on all four
 datasets** — which is the more interesting number, because it is not a
