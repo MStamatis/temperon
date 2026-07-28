@@ -19,6 +19,32 @@ accelerates targets that only expensive methods reach at all. See
 [Honest scope](#honest-scope) — that boundary is measured, stated, and part of
 the result.
 
+## What Temperon does
+
+One training run, two stages, one scheduled switch. On vision (the reference
+recipe, `configs/arm_P_handoff.yaml`):
+
+1. **Explorer — epochs 1–43: plain SGD.** Nesterov SGD (lr 0.1, wd 5e-4) on a
+   cyclic cosine schedule. No SAM anywhere in this stage, so every epoch costs
+   the cheap price (~17s vs ~76s on CIFAR-100). The particular schedule is not
+   load-bearing: a single cosine matches the cyclic one (p=0.61).
+2. **The switch — epoch 43, scheduled, not adaptive.** One hand-off at a fixed
+   43% of the epoch budget. Momentum carries over; the incoming optimizer gets
+   a 200-step LR warmup and SAM's ρ ramps from zero over 400 steps, so the
+   switch never shocks the loss.
+3. **Refiner — epochs 44–100: SAM+Muon owning a fresh cosine anneal.** Muon
+   (lr 0.01, wd 0.2) wrapped in SAM's two-pass ascent–descent (ρ=0.05),
+   annealed to zero over the remaining 57 epochs. All of the SAM budget is
+   spent here, and this stage is the measured accuracy contribution (+0.85pp
+   over the same run with an SGD refiner).
+
+Two rules generalize across every task we measured: **spend SAM only in the
+tail**, and **let the tail own the entire final anneal** — switching mid-decay
+(arm O) loses, switching at the decay boundary wins. The base optimizer of the
+tail is per-task: Muon where it buys a tier (CIFAR-10/100, SVHN), SGD where it
+does not (Tiny ImageNet), Muon under WSD for GPT-2 pretraining (SAM switches
+on at 70% of steps, nothing else changes), AdamW for GLUE fine-tuning.
+
 Everything runs inside a Docker container on a single NVIDIA RTX 5090
 (Blackwell, sm_120, 32 GB VRAM). All numbers below come from runs in this
 repository; see [REPRODUCE.md](REPRODUCE.md) for the exact commands.
