@@ -54,7 +54,9 @@ repository; see [REPRODUCE.md](REPRODUCE.md) for the exact commands.
 ## Headline results
 
 Vision, 5 seeds per arm (`42, 1181241943, 958682846, 271828, 314159`),
-wide ResNet-110, 100 epochs. "Hand-off" = cyclic SGD explorer for 43 epochs,
+wide ResNet-110 (the He et al. depth-110 topology at 4× width: stages
+64/128/256, 27.6M parameters vs the original's 1.7M — so no external
+"ResNet-110" number is comparable to these), 100 epochs. "Hand-off" = cyclic SGD explorer for 43 epochs,
 one scheduled switch, then a SAM+Muon tail owning a fresh cosine anneal.
 
 Both full-time-SAM baselines are shown on every dataset: **SAM+SGD** is the
