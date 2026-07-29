@@ -61,8 +61,9 @@ Both full-time-SAM baselines are shown on every dataset: **SAM+SGD** is the
 published recipe ([Foret et al., 2021](https://arxiv.org/abs/2010.01412))
 re-run here, and **SAM+Muon** is this project's own stronger combination.
 **Late-phase SAM** ([arXiv:2410.10373](https://arxiv.org/abs/2410.10373)) is
-the closest published rival, re-run at a matched SAM budget on the two datasets
-marked — it belongs in this table precisely because it beats us in some cells.
+the closest published rival, re-run at a matched SAM budget on all four
+datasets — it belongs in this table precisely because it beats us in some
+cells.
 Cells give final test accuracy (5-seed mean ± sd) and, below, the time to the
 hardest target that any method reaches, with the fraction of seeds reaching it.
 
@@ -83,20 +84,24 @@ ours. Raw wall-clock is kept alongside in
 |---|---|---|---|---|
 | **CIFAR-100** (0.82) | **0.8295 ± 0.0034**<br>4643s · 5/5 | 0.8234 ± 0.0011<br>**3022s** · 5/5 | 0.8232 ± 0.0031<br>4679s · 4/5 | 0.8292 ± 0.0021<br>7190s · 5/5 |
 | **Tiny ImageNet** (0.69) | 0.7003 ± 0.0033<br>6359s · 5/5 | 0.7020 ± 0.0028<br>**5750s** · 5/5 | **0.7027 ± 0.0032**<br>9333s · 5/5 | 0.6838 ± 0.0019<br>never |
-| **CIFAR-10** (0.968) | **0.9695 ± 0.0008**<br>**4849s** · 5/5 | *not run* | 0.9668 ± 0.0005<br>4990s · 1/5 | 0.9694 ± 0.0008<br>7371s · 5/5 |
-| **SVHN** (0.98) | **0.9807 ± 0.0005**<br>6948s · 5/5 | *not run* | 0.9798 ± 0.0004<br>7029s · 3/5 | 0.9804 ± 0.0003<br>**5084s** · 5/5 |
+| **CIFAR-10** (0.968) | **0.9695 ± 0.0008**<br>4849s · 5/5 | 0.9688 ± 0.0006<br>**3121s** · 4/5 | 0.9668 ± 0.0005<br>4990s · 1/5 | 0.9694 ± 0.0008<br>7371s · 5/5 |
+| **SVHN** (0.98) | **0.9807 ± 0.0005**<br>6948s · 5/5 | 0.9798 ± 0.0005<br>**5003s** · 3/5 | 0.9798 ± 0.0004<br>7029s · 3/5 | 0.9804 ± 0.0003<br>5084s · 5/5 |
 
 Read that as: Temperon **ties the best full-time-SAM recipe on accuracy
 everywhere** (Welch p = 0.87 / 0.29 / 0.94 / 0.28) while reaching the hard
 target **−35%** sooner on CIFAR-100, **−34%** on CIFAR-10 and **−32%** on Tiny
 ImageNet. On SVHN it does not win on time — the boundary case documented below.
 
-The rival column holds the fastest time in both rows where it exists, and the
-two rows mean opposite things. On CIFAR-100 the mid target is simply not where
-Temperon competes: the rival tops out at 0.8234 and never reaches 0.83, which
-Temperon reaches in 3 of 5 seeds — the tier above is the win. On Tiny ImageNet
-there is no tier above (SAM+Muon *loses* there) and the rival's row is a plain
-defeat for us — see [the closest rival](#the-closest-rival-measured).
+The rival column holds the fastest time in every row, and what the rows mean
+splits three ways. On CIFAR-100 and CIFAR-10 the mid target is not where
+Temperon competes: the rival never reaches the tier above it — 0.83 in 0/5
+seeds (Temperon 3/5), 0.97 in 0/5 (Temperon 2/5, and only Muon-refined arms
+at all) — and that tier is the win. On SVHN the rival's 5003s is the median
+of only the 3 seeds that reach 0.98 at all, its final sits 0.09pp below
+Temperon (p=0.025), and SAM+Muon reaches 0.98 by epoch 45 in every seed — the
+robust choice there. On Tiny ImageNet there is no tier above (SAM+Muon
+*loses* there) and the rival's row is a plain defeat for us — see
+[the closest rival](#the-closest-rival-measured).
 Against the published SAM+SGD recipe specifically Temperon is ahead on accuracy
 on three of four datasets (+0.63pp p=0.016, +0.27pp p<0.001, +0.09pp p=0.015)
 and reaches the target in more seeds on two.
@@ -181,20 +186,27 @@ applied only late can match full SAM. It is re-run here at our own tuned
 hyper-parameters and a matched SAM budget (`configs/latesam/`, 5 seeds), and it
 does two things at once — one for us and one against.
 
-**For the thesis.** It reproduces full-time SAM+SGD to within noise on both
-datasets it was run on — CIFAR-100 (0.8234 ± 0.0011 vs 0.8232 ± 0.0031,
-p=0.896) and Tiny ImageNet (0.7020 ± 0.0028 vs 0.7027 ± 0.0032, p=0.720) —
-while paying for SAM on 57 of 100 epochs instead of all of them: −35% and −29%
-respectively. An independent method, in our pipeline, arriving at the
-allocation law from the other direction.
+**For the thesis.** It reproduces — or beats — full-time SAM+SGD on all four
+datasets while paying for SAM on 57 of 100 epochs instead of all of them:
+within noise on CIFAR-100 (0.8234 vs 0.8232, p=0.896), Tiny ImageNet (0.7020
+vs 0.7027, p=0.720) and SVHN (0.9798 vs 0.9798, p=0.846), and clearly above
+it on CIFAR-10 (+0.20pp, p<0.001, where the published recipe reaches the
+0.968 target in only 1 of 5 seeds). An independent method, in our pipeline,
+arriving at the allocation law from the other direction.
 
-**Against us.** At the 0.82 target on CIFAR-100 it is **34% faster than
-Temperon** (3022s vs 4643s). If 0.82 is what you need there, use it, not this.
+**Against us.** It is the fastest measured route to the mid target on every
+dataset: 0.82 on CIFAR-100 **34% sooner** than Temperon (3022s vs 4643s),
+0.968 on CIFAR-10 **36% sooner** (3121s vs 4849s, though in 4 of 5 seeds),
+0.69 on Tiny ImageNet 10% sooner, and at SVHN's 0.98 its 3-of-5 median
+(5003s) numerically edges even SAM+Muon's all-seed 5084s. If the mid target
+is all you need, use it, not this.
 
-What it cannot do on CIFAR-100 is go higher. Its accuracy is 0.8234 ± 0.0011 —
-a tighter band than any other arm here — and it reaches 0.83 in **0 of 5
-seeds**, as does every other SGD-refined arm. Temperon reaches 0.83 in 3 of 5
-at 4870s. The two methods are not competing for the same point on the frontier.
+What it cannot do is reach the tier the Muon refiner buys. On CIFAR-100 it
+never reaches 0.83 (0/5 seeds; Temperon 3/5, at 4870s). On CIFAR-10 it never
+reaches 0.97 (0/5; Temperon 2/5 — a target only Muon-refined arms touch at
+all). On SVHN its final sits 0.09pp below Temperon (p=0.025). On three of
+four datasets the two methods are not competing for the same point on the
+frontier — the exception is next.
 
 **On Tiny ImageNet it wins outright, and we say so.** There it matches
 Temperon's final accuracy (0.7020 ± 0.0028 vs 0.7003 ± 0.0033, p=0.42) and
@@ -247,9 +259,11 @@ Measured limits, stated because they define where the method applies:
 
 - **The cheap optimizer wins below its own ceiling.** On CIFAR-100 plain SGD
   reaches 0.80 in 1567s; Temperon needs 4416s. SGD never reaches 0.82.
-- **A cheaper allocation wins below *its* ceiling too.** Late-phase SAM reaches
-  0.82 34% sooner than Temperon on CIFAR-100. The win here starts above 0.8234,
-  which is where every SGD-refined method stops.
+- **A cheaper allocation wins below *its* ceiling too.** Late-phase SAM
+  reaches the mid target sooner than Temperon on every dataset (−34% on
+  CIFAR-100, −36% on CIFAR-10). The win here starts above the SGD-refined
+  ceiling — 0.8234 on CIFAR-100, 0.9688 on CIFAR-10 — which no arm without a
+  Muon refiner crosses.
 - **Where the expensive refiner buys nothing, the rival wins outright.** On
   Tiny ImageNet SAM+Muon is 1.8pp *worse* than SAM+SGD, so there is no higher
   tier to reach — and late-phase SAM matches Temperon's accuracy there (p=0.42)
