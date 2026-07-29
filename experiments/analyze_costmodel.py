@@ -48,10 +48,12 @@ ARMS = {
     "full SAM+SGD tiny":  ("bench/tiny/tiny_samsgd", "tiny"),
     "tuned SGD tiny":     ("bench/tiny/tiny_strongsgd", "tiny"),
     "Temperon c10":       ("phase6/arm_P_c10", "c10"),
+    "late-phase SAM c10": ("latesam/c10_latesam", "c10"),
     "full SAM+Muon c10":  ("bench/c10/c10_sammuon", "c10"),
     "full SAM+SGD c10":   ("bench/c10/c10_samsgd", "c10"),
     "tuned SGD c10":      ("bench/c10/c10_strongsgd", "c10"),
     "Temperon svhn":      ("phase6/arm_P_svhn", "svhn"),
+    "late-phase SAM svhn": ("latesam/svhn_latesam", "svhn"),
     "full SAM+Muon svhn": ("bench/svhn/svhn_sammuon", "svhn"),
     "full SAM+SGD svhn":  ("bench/svhn/svhn_samsgd", "svhn"),
     "tuned SGD svhn":     ("bench/svhn/svhn_strongsgd", "svhn"),
@@ -70,7 +72,8 @@ def read_epochs(run_dir):
 
 def load(sub):
     pat = os.path.join(glob.escape(os.path.join(ROOT, *sub.split("/"))), "seed*")
-    return {os.path.basename(d): read_epochs(d) for d in sorted(glob.glob(pat))}
+    return {os.path.basename(d): read_epochs(d) for d in sorted(glob.glob(pat))
+            if os.path.exists(os.path.join(d, "epochs.csv"))}
 
 
 def main():
