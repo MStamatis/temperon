@@ -97,3 +97,37 @@ Outcomes, in the order they will be reported:
   stage.
 - No claim about the refiner-choice decision (Muon vs SGD tail); that is a
   separate question with n=1 evidence (tiny) and is not tested here.
+
+---
+
+## Outcome (added after the replay ran; the lock is commit 3637e95)
+
+Replay executed 2026-07-29, `results/analysis_stopping.txt`. By the letter of
+the criteria: **PREDICTIVE-ONLY at best, and the mechanism argues against
+spending GPU on it.**
+
+- Four primary-substrate cells (W=8, c=0.25/0.30) pass both hard constraints
+  (c100 median 35, LM 0.61–0.70) but every one fails cross-seed stability —
+  c10 spreads up to ±33 epochs. Their predictions are noise.
+- Every other vision cell fires far too early (medians 16–35 vs the
+  known-good 43). The diagnosis is structural, not parametric: **under a
+  cosine schedule the explorer's val-acc curve is plateau-then-surge** — the
+  big gains arrive with the final anneal — so a slope rule reads the mid-run
+  plateau as exhaustion and fires 10–20 epochs before the surge it cannot
+  see coming. The stopping information lives in the schedule's future, not
+  the trajectory's past. This retroactively explains *why* the scheduled
+  hand-off is the right form on vision and why arm O (mid-decay switch)
+  failed.
+- The cyclic substrate is worse: the running-max envelope goes flat between
+  cycle peaks, so the rule fires at the first inter-cycle valley (~ep 23–27,
+  spread ~0) — an artifact, dead on arrival.
+- **LM is the one place the rule works** (fires 0.61–0.70 vs manual 0.70),
+  because the WSD stable phase genuinely has diminishing returns — the one
+  curve shape matching the rule's assumption. It even suggests the stable
+  phase is exhausted by ~0.61, a GPU-testable prediction (move decay+tail to
+  0.61, expect equal quality at less time) left unrun.
+
+Consequence: Phase 9 as "adaptive tail_frac on vision" is closed by this
+replay — the fixed, anneal-aligned schedule stands, now with a measured
+reason. The salvageable follow-ups are the WSD early-exit prediction above
+and the untouched refiner-choice question.
