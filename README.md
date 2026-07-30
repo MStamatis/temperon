@@ -116,8 +116,16 @@ The **allocation control** matters more than the amount: uniform periodic SAM
 at equal-or-greater budget reaches only 0.8183 ± 0.0016 on CIFAR-100, i.e.
 1.12pp below the hand-off (p=0.001) while spending more time.
 
-Language model (GPT-2 124M, WikiText-103, 400M-token budget, 1 seed): the tail
-arm matches full-time SAM (3.3051 vs 3.3101 val loss, inside the measured noise
+Language model (GPT-2 124M, WikiText-103, 400M-token budget, 1 seed,
+back-to-back runs on the same GPU):
+
+| arm | val loss | ppl | wall-clock |
+|---|---|---|---|
+| Muon, no SAM | 3.3182 | 27.61 | **3079s** |
+| SAM+Muon, full-time | 3.3101 | 27.39 | 5335s |
+| **SAM tail** *(ours = the late-phase allocation)* | **3.3051** | **27.25** | 3796s · **−29%** |
+
+The tail matches full-time SAM (the 0.005 gap is inside the measured noise
 floor) at **−29% wall-clock**, and beats it by **0.063 nats at equal
 wall-clock**. There is no separate rival column for the LM, and the reason is
 worth stating: the tail arm here *is* the late-phase allocation — one WSD
