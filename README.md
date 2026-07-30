@@ -82,7 +82,7 @@ form another reader can use, since their seconds-per-epoch will differ from
 ours. Raw wall-clock is kept alongside in
 [`analysis_costmodel.txt`](results/latesam/analysis_costmodel.txt).
 
-| dataset (target) | Temperon | late-phase SAM *(rival, re-run)* | SAM+SGD *(published, re-run)* | SAM+Muon *(ours, full-time)* |
+| dataset (target) | Temperon *(ours)* | late-phase SAM *(rival, re-run)* | SAM+SGD *(published, re-run)* | SAM+Muon *(ours, full-time)* |
 |---|---|---|---|---|
 | **CIFAR-100** (0.82) | **0.8295 ± 0.0034**<br>4643s · 5/5 | 0.8234 ± 0.0011<br>**3022s** · 5/5 | 0.8232 ± 0.0031<br>4679s · 4/5 | 0.8292 ± 0.0021<br>7190s · 5/5 |
 | **Tiny ImageNet** (0.69) | 0.7003 ± 0.0033<br>6359s · 5/5 | 0.7020 ± 0.0028<br>**5750s** · 5/5 | **0.7027 ± 0.0032**<br>9333s · 5/5 | 0.6838 ± 0.0019<br>never |
