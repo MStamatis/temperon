@@ -84,7 +84,7 @@ of training, then a stronger optimizer owning the SAM tail:
 from temperon import cosine_tail
 
 explorer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
-refiner  = Muon(model.parameters(), lr=0.01, weight_decay=0.2)
+refiner  = Muon(model.parameters(), lr=0.01, weight_decay=0.2)  # any Muon impl.
 
 opt = Temperon(explorer, total_steps=total, tail_frac=0.57,
              tail_optimizer=refiner, transfer="momentum")

@@ -246,3 +246,24 @@ def test_wsd_rejects_bad_arguments():
         wsd(100, 10, 1.5)
     with pytest.raises(ValueError):
         cosine_tail(100, tail_frac=0.0)
+
+
+def test_momentum_transfer_into_adam_tail_is_a_safe_no_op():
+    # Seeding momentum_buffer into an Adam-family tail would leave its state
+    # non-empty before the first step and crash slot init (KeyError:
+    # 'exp_avg'). The hand-off must skip groups without a `momentum` hyper-
+    # parameter and the tail must then step cleanly.
+    model = _model()
+    p = list(model.parameters())
+    cheap = torch.optim.SGD(p, lr=0.1, momentum=0.9)
+    tail = torch.optim.AdamW(p, lr=1e-3)
+    opt = Temperon(cheap, total_steps=10, tail_frac=0.5,
+                   tail_optimizer=tail, transfer="momentum")
+    calls = []
+    closure = _closure_factory(model, opt, calls)
+    for _ in range(10):
+        opt.step(closure)
+    assert opt.optimizer is tail
+    for state in tail.state.values():
+        assert "momentum_buffer" not in state
+        assert "exp_avg" in state

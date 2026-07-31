@@ -88,8 +88,9 @@ class Temperon:
         self.transfer: Transfer = transfer
         self.eps = float(eps)
 
-        # First step index owned by the SAM tail. tail_frac=0 means SAM from
-        # the start; tail_frac=1 means never (a no-SAM baseline arm).
+        # First step index owned by the SAM tail. tail_frac=1 means SAM from
+        # the start (a full-time-SAM arm); tail_frac=0 means never (a no-SAM
+        # baseline arm).
         self.tail_start = int(round((1.0 - self.tail_frac) * self.total_steps))
         self.step_count = 0
         self._switched = False
@@ -185,11 +186,20 @@ class Temperon:
         only if the cheap optimizer had one for them. A raw copy is exact here:
         SGD's and Muon's `momentum_buffer` both accumulate a discounted sum of
         gradients, and there is no second moment to mis-seed.
+
+        The copy targets only param groups that expose a `momentum`
+        hyper-parameter (SGD/Muon-family). Seeding `momentum_buffer` into an
+        Adam-family optimizer would leave its state dict non-empty before its
+        first step, which makes torch skip slot initialization and crash with
+        KeyError: 'exp_avg' -- the same trap the perturbation storage above
+        avoids.
         """
         n = 0
         if self.transfer == "momentum":
             old_params = {p for g in self._opt.param_groups for p in g["params"]}
             for group in self._tail_opt.param_groups:
+                if "momentum" not in group:
+                    continue
                 for p in group["params"]:
                     if p not in old_params:
                         continue
