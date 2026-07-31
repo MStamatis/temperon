@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software or its results, please cite it as below."
+message: "If you use this software or its results, please cite the preprint below."
 title: "Temperon: sharpness-budget allocation for wall-clock-efficient training"
 abstract: >-
   Research code for a study of where to spend an expensive training mode.
@@ -13,6 +13,8 @@ authors:
     given-names: Stamatis
     email: stamatis@tmnetworks.gr
 repository-code: "https://github.com/MStamatis/temperon"
+url: "https://pypi.org/project/temperon/"
+version: 0.1.0
 license: MIT
 type: software
 keywords:
@@ -22,3 +24,13 @@ keywords:
   - muon
   - wall-clock efficiency
   - deep learning
+preferred-citation:
+  type: article
+  title: "Temperon: Full-Time SAM Quality at a Third Less Wall-Clock"
+  authors:
+    - family-names: Mastromichalakis
+      given-names: Stamatis
+      email: stamatis@tmnetworks.gr
+  year: 2026
+  journal: "arXiv preprint"
+  notes: "arXiv identifier pending; will be added on announcement."
