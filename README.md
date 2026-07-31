@@ -126,7 +126,7 @@ back-to-back runs on the same GPU):
 | **SAM tail** *(ours = the late-phase allocation)* | **3.3051** | **27.25** | 3796s · **−29%** |
 
 The tail matches full-time SAM (the 0.005 gap is inside the measured noise
-floor) at **−29% wall-clock**, and beats it by **0.063 nats at equal
+floor) at **−29% wall-clock**, and beats it by **0.061 nats at equal
 wall-clock**. There is no separate rival column for the LM, and the reason is
 worth stating: the tail arm here *is* the late-phase allocation — one WSD
 schedule, no explorer, no restarts, SAM switched on for the final 30% of steps
@@ -144,7 +144,7 @@ Skipping SAM before the switch buys a fixed credit: `43 × (cost of a SAM epoch
 it is the whole method.
 
 Handing the tail to Muon spends it. Muon costs **1.50×** a SAM+SGD epoch —
-1.505 / 1.509 / 1.495 / 1.497 across the four datasets, a constant we did not
+1.504 / 1.508 / 1.495 / 1.497 across the four datasets, a constant we did not
 expect to be that flat — and the premium very nearly cancels the credit:
 
 | dataset | tail | credit | premium | net time | accuracy |
