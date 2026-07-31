@@ -321,7 +321,7 @@ arms are kept deliberately: the negative results are the controls that support
 the main claim.
 
 ```
-src/eos_switch/
+src/eos_switch/  # the project's original name, kept on purpose -- see the note below
   probes/        # curvature & stability measurement (fp32, no autocast/TF32)
   optimizers/    # muon, SAM, sharp_muon, OptiRoulette adapter, state transfer
   controllers/   # fixed / cyclic / sam_catapult / handoff / eos_switch / ...
