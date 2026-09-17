@@ -1,6 +1,6 @@
 [project]
 name = "temperon"
-version = "0.1.0"
+version = "0.1.1"
 description = "Temperon: pay for sharpness-aware minimization only where it pays you back"
 readme = "README.md"
 requires-python = ">=3.10"
