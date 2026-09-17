@@ -5,6 +5,9 @@ an expensive training mode. Named after *tempering*, the controlled heat
 treatment applied after quenching that sets a metal's final toughness, because
 that is exactly what the method governs: what happens during the last anneal.
 
+**Paper:** [arXiv:2609.17575](https://arxiv.org/abs/2609.17575) ·
+**Package:** [`pip install temperon`](https://pypi.org/project/temperon/)
+
 The finding, in one sentence:
 
 > Sharpness-Aware Minimization pays for its second pass only in the final
@@ -412,15 +415,31 @@ Batch size is fixed at 128 in all comparative vision arms
 
 See **[REPRODUCE.md](REPRODUCE.md)** for the command behind each table above.
 
-## Planned library
+## Library
 
-The method will ship as a small standalone library in this repository
-(`pip install temperon`, `import temperon`), whose CI asserts that it
-reproduces the trajectories of the research code archived here. It is not
-published yet; until then this repository is the reference implementation.
+The method ships as a small standalone package, published on PyPI as
+[`temperon`](https://pypi.org/project/temperon/) (`pip install temperon`,
+`import temperon`). Its source is in [`package/`](package/), and release
+0.1.0 is tagged `v0.1.0`. The package tests are CPU unit tests of the
+wrapper's mechanics: the tail gate, the ρ ramp, the hand-off and momentum
+transfer, checkpointing, and the schedules. Every number in this README comes
+from the research code in `src/eos_switch/`, not from the package.
 
 ## Citing and license
 
-MIT (see [LICENSE](LICENSE)). Citation metadata in
+If you use Temperon, please cite the preprint,
+[arXiv:2609.17575](https://arxiv.org/abs/2609.17575):
+
+```bibtex
+@article{mastromichalakis2026temperon,
+  title   = {Temperon: Full-Time {SAM} Quality at a Third Less Wall-Clock},
+  author  = {Mastromichalakis, Stamatis},
+  journal = {arXiv preprint arXiv:2609.17575},
+  year    = {2026},
+  doi     = {10.48550/arXiv.2609.17575}
+}
+```
+
+The code is MIT (see [LICENSE](LICENSE)), and citation metadata is in
 [CITATION.cff](CITATION.cff). The vendored OptiRoulette under `third_party/`
 is MIT by the same author.

@@ -35,5 +35,6 @@ preferred-citation:
       email: stamatis@tmnetworks.gr
       orcid: "https://orcid.org/0000-0003-1713-5078"
   year: 2026
-  journal: "arXiv preprint"
-  notes: "arXiv identifier pending; will be added on announcement."
+  journal: "arXiv preprint arXiv:2609.17575"
+  doi: "10.48550/arXiv.2609.17575"
+  url: "https://arxiv.org/abs/2609.17575"

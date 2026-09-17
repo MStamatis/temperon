@@ -111,9 +111,22 @@ Measured limits, stated because they define where the method applies:
 
 ## Citing
 
-See [CITATION.cff](https://github.com/MStamatis/temperon/blob/main/CITATION.cff).
-The research code and the full experimental record — including the negative
-controls this claim rests on — live in the same repository.
+If you use Temperon, please cite the preprint,
+[arXiv:2609.17575](https://arxiv.org/abs/2609.17575):
+
+```bibtex
+@article{mastromichalakis2026temperon,
+  title   = {Temperon: Full-Time {SAM} Quality at a Third Less Wall-Clock},
+  author  = {Mastromichalakis, Stamatis},
+  journal = {arXiv preprint arXiv:2609.17575},
+  year    = {2026},
+  doi     = {10.48550/arXiv.2609.17575}
+}
+```
+
+The research code and the full experimental record, including the negative
+controls this claim rests on, live in
+[the same repository](https://github.com/MStamatis/temperon).
 
 ## License
 
